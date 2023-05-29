@@ -91,6 +91,8 @@ class TestReceiver {
         )
         msg2.subject = "test2"
         msg2.setText("test")
+
+        Thread.sleep(1000)
         transport.sendMessage(msg2, msg2.allRecipients)
 
         twoMessagesLatch.await(10, TimeUnit.SECONDS)
@@ -110,7 +112,6 @@ class TestReceiver {
 
         receiver.start()
         Thread.sleep(1000)
-        receiver.stop()
 
         assertEquals(receivedMessages.size, 3)
 
@@ -122,6 +123,7 @@ class TestReceiver {
             assertEquals(it.content.toString(), "test\r\n")
         }
 
+        receiver.stop()
         greenMailPOP3.stop()
     }
 

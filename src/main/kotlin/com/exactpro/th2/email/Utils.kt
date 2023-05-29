@@ -103,6 +103,7 @@ fun findResumeMessageNumber(folder: Folder, previousDate: Date): Int? {
             val message = folder.getMessage(nearestMessageNumberTop)
             val messageDate = message.date() ?: continue
             if(messageDate.before(previousDate)) break
+            if(messageDate == previousDate && folder.messageCount == nearestMessageNumberTop) return null
             resumeMessageNumber = nearestMessageNumberTop
             nearestMessageNumberTop -= 1
         }
@@ -115,6 +116,7 @@ fun findResumeMessageNumber(folder: Folder, previousDate: Date): Int? {
             val message = folder.getMessage(nearestMessageNumberBottom)
             val messageDate = message.date() ?: continue
             if(messageDate.after(previousDate)) break
+            if(messageDate == previousDate && folder.messageCount == nearestMessageNumberBottom) return null
             resumeMessageNumber = nearestMessageNumberBottom
             nearestMessageNumberBottom += 1
         }
