@@ -35,7 +35,7 @@ class IMAPReceiver(
     private val handler: (Message) -> Unit,
     private val receiverConfig: ReceiverConfig,
     private val executorService: ExecutorService,
-    private val getLastProcessedDate: () -> Date?,
+    getLastProcessedDate: () -> Date?,
     private val sendEvent: (Event) -> Unit
 ): IReceiver {
     override val service: Service = session.store
@@ -98,57 +98,6 @@ class IMAPReceiver(
     }
 
     override fun getState() = lastProcessedMessageDate?.let { FileState(it) }
-
-    private fun findResumeMessageNumber(folder: Folder, previousDate: Date): Int? {
-        var low = 1
-        var high = folder.messageCount
-        var resumeMessageNumber: Int? = null
-
-        var nearestMessageNumberTop: Int? = null
-        var nearestMessageNumberBottom: Int? = null
-
-        while (low <= high) {
-            val mid = (low + high) / 2
-            val message = folder.getMessage(mid) as IMAPMessage
-
-            val messageDate = message.date()
-
-            if (messageDate != null && messageDate.after(previousDate)) {
-                nearestMessageNumberTop = mid
-                high = mid - 1
-            } else {
-                nearestMessageNumberBottom = mid
-                low = mid + 1
-            }
-        }
-
-
-        if(nearestMessageNumberBottom == null && nearestMessageNumberTop == null) return null
-
-        if(nearestMessageNumberTop != null) {
-            while (nearestMessageNumberTop > 0) {
-                val message = folder.getMessage(nearestMessageNumberTop)
-                val messageDate = message.date() ?: continue
-                if(messageDate.before(previousDate) || messageDate == previousDate) break
-                resumeMessageNumber = nearestMessageNumberTop
-                nearestMessageNumberTop -= 1
-            }
-
-            return resumeMessageNumber
-        }
-
-        if(nearestMessageNumberBottom != null) {
-            while (nearestMessageNumberBottom < folder.messageCount + 1) {
-                val message = folder.getMessage(nearestMessageNumberBottom)
-                val messageDate = message.date() ?: continue
-                if(messageDate.after(previousDate)) break
-                resumeMessageNumber = nearestMessageNumberBottom
-                nearestMessageNumberBottom += 1
-            }
-        }
-
-        return resumeMessageNumber
-    }
 
     override fun stop() {
         isRunning = false

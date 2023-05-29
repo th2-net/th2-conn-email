@@ -15,13 +15,8 @@
  */
 package com.exactpro.th2.email
 
-import com.exactpro.th2.common.grpc.ConnectionID
-import com.exactpro.th2.common.grpc.Direction
-import com.exactpro.th2.common.grpc.MessageID
-import com.exactpro.th2.common.grpc.RawMessage
-import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.email.config.CertificateInfo
-import com.google.protobuf.ByteString
+import jakarta.mail.Folder
 import jakarta.mail.Message
 import java.io.File
 import java.io.FileInputStream
@@ -30,11 +25,7 @@ import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
 import java.text.ParseException
 import java.text.SimpleDateFormat
-import java.time.Instant
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
+import java.util.*
 import javax.net.SocketFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
@@ -61,31 +52,6 @@ fun Message.date(): Date? = receivedDate ?: try {
     sentDate
 }
 
-val generateSequence = Instant.now().run {
-    AtomicLong(TimeUnit.SECONDS.toNanos(epochSecond) + nano)
-}::incrementAndGet
-
-fun Message.toRawMessage(connectionId: ConnectionID, direction: Direction): RawMessage.Builder = RawMessage.newBuilder().apply {
-    val messageDate = date()?.time?.toString()
-    metadataBuilder.putAllProperties(
-        mapOf(
-            SUBJECT_PROPERTY to (this@toRawMessage.subject ?: ""),
-            FROM_PROPERTY to (this@toRawMessage.from.firstOrNull()?.toString() ?: ""),
-            DATE_PROPERTY to (messageDate ?: ""),
-            FOLDER_PROPERTY to (this@toRawMessage.folder?.toString() ?: "")
-        ),
-    )
-    this.metadataBuilder.id = createId(connectionId, generateSequence())
-    this.direction = direction
-    this.body = ByteString.copyFrom(this@toRawMessage.content.toString().toByteArray(Charsets.UTF_8))
-}
-
-fun createId(connectionId: ConnectionID, sequence: Long) = MessageID.newBuilder().apply {
-    this.connectionId = connectionId
-    this.direction = Direction.FIRST
-    this.sequence = sequence
-}.build()
-
 fun Date.string() = time.toString()
 
 fun getCustomFactory(certificateInfo: CertificateInfo): SocketFactory {
@@ -104,4 +70,57 @@ fun getCustomFactory(certificateInfo: CertificateInfo): SocketFactory {
     sslContext.init(null, trustManagerFactory.trustManagers, null)
 
     return sslContext.socketFactory
+}
+
+fun findResumeMessageNumber(folder: Folder, previousDate: Date): Int? {
+    var low = 1
+    var high = folder.messageCount
+    var resumeMessageNumber: Int? = null
+
+    var nearestMessageNumberTop: Int? = null
+    var nearestMessageNumberBottom: Int? = null
+
+    while (low <= high) {
+        val mid = (low + high) / 2
+        val message = folder.getMessage(mid)
+
+        val messageDate = message.date()
+
+        if (messageDate != null && messageDate.after(previousDate)) {
+            nearestMessageNumberTop = mid
+            high = mid - 1
+        } else {
+            nearestMessageNumberBottom = mid
+            low = mid + 1
+        }
+    }
+
+
+    if(nearestMessageNumberBottom == null && nearestMessageNumberTop == null) return null
+
+    if(nearestMessageNumberTop != null) {
+        while (nearestMessageNumberTop > 0) {
+            val message = folder.getMessage(nearestMessageNumberTop)
+            val messageDate = message.date() ?: continue
+            if(messageDate.before(previousDate)) break
+            resumeMessageNumber = nearestMessageNumberTop
+            nearestMessageNumberTop -= 1
+        }
+
+        return resumeMessageNumber?.let { it + 1 }
+    }
+
+    if(nearestMessageNumberBottom != null) {
+        while (nearestMessageNumberBottom < folder.messageCount + 1) {
+            val message = folder.getMessage(nearestMessageNumberBottom)
+            val messageDate = message.date() ?: continue
+            if(messageDate.after(previousDate)) break
+            resumeMessageNumber = nearestMessageNumberBottom
+            nearestMessageNumberBottom += 1
+        }
+
+        return resumeMessageNumber?.let { it - 1 }
+    }
+
+    return resumeMessageNumber
 }
