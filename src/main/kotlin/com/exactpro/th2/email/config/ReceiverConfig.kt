@@ -26,7 +26,7 @@ data class ReceiverConfig(
     val fetchCount: Int = 1000,
     val reconnectInterval: Long = 1000,
     val pollInterval: Long = 60000,
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssZ")
     val startProcessingAtLeastFrom: Date? = Date(Long.MIN_VALUE)
 ) {
     init {
