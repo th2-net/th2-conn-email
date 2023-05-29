@@ -27,8 +27,7 @@ data class ReceiverConfig(
     val reconnectInterval: Long = 1000,
     val pollInterval: Long = 60000,
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    val startProcessingAtLeastFrom: Date? = Date(Long.MIN_VALUE),
-    val loadDatesFromCradle: Boolean = false
+    val startProcessingAtLeastFrom: Date? = Date(Long.MIN_VALUE)
 ) {
     init {
         require(type in ReceiverType.aliases()) { "Invalid type ${type}. Type should be one of the following: ${ReceiverType.aliases()}" }

@@ -31,7 +31,8 @@ import com.exactpro.th2.email.api.impl.POP3SessionProvider
 import com.exactpro.th2.email.api.impl.SMTPSessionProvider
 import com.exactpro.th2.email.config.ReceiverType
 import com.exactpro.th2.email.config.Settings
-import com.exactpro.th2.email.loader.TimeLoader
+import com.exactpro.th2.email.loader.CradleTimeLoader
+import com.exactpro.th2.email.loader.FileTimeLoader
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
@@ -101,18 +102,24 @@ fun main(args: Array<String>) = try {
         messageRouter.sendAll(it, QueueAttribute.RAW.name, QueueAttribute.PUBLISH.name)
     }
 
-    val dataProviderService = if(settings.clients.any { it.receiver.loadDatesFromCradle }) {
-        val grpcRouter = factory.grpcRouter
-        resources += "grpc router" to grpcRouter::close
-        grpcRouter.getService(DataProviderService::class.java)
-    } else null
-
     val rootEventId = toEventID(factory.rootEventId)
 
     val sendHandlers = mutableMapOf<String, (RawMessage) -> Unit>()
     val receivers = mutableMapOf<String, IReceiver>()
 
-    val timeLoader = dataProviderService?.let { TimeLoader(dataProviderService) }
+
+    val timeLoader = if(settings.loadStateFromCradle) {
+        val grpcRouter = factory.grpcRouter
+        resources += "grpc router" to grpcRouter::close
+        val dataProviderService = grpcRouter.getService(DataProviderService::class.java)
+        CradleTimeLoader(dataProviderService, settings.stateFilePath)
+    } else {
+        FileTimeLoader(settings.stateFilePath)
+    }
+
+    resources += "Saving state" to {
+        timeLoader.writeState()
+    }
 
     for(client in settings.clients) {
         val connectionId = ConnectionID.newBuilder().apply {
@@ -136,11 +143,7 @@ fun main(args: Array<String>) = try {
         }
 
         val dateLoader: () -> Date? = {
-            if (client.receiver.loadDatesFromCradle) {
-                timeLoader?.loadLastProcessedMessageReceiveDate(client.sessionAlias)
-            } else {
-                null
-            }
+            timeLoader.loadLastProcessedMessageReceiveDate(client.sessionAlias)
         }
 
         val receiver = when (client.receiver.type) {
@@ -190,6 +193,10 @@ fun main(args: Array<String>) = try {
 
         receivers[client.sessionAlias] = receiver
         sendHandlers[client.sessionAlias] = send
+
+        resources += "${client.sessionAlias} receiver state" to {
+            receiver.getState()?.let { timeLoader.updateState(client.sessionAlias, it) }
+        }
 
         resources += "${client.sessionAlias} sender" to sender::close
         resources += "${client.sessionAlias} receiver" to receiver::stop

@@ -18,6 +18,7 @@ package com.exactpro.th2.email
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.email.api.IReceiver
 import com.exactpro.th2.email.config.ReceiverConfig
+import com.exactpro.th2.email.loader.FileState
 import jakarta.mail.Folder
 import jakarta.mail.Message
 import jakarta.mail.Service
@@ -63,6 +64,8 @@ class POP3Receiver(
         }
         service.close()
     }
+
+    override fun getState() = lastProcessedMessageDate?.let { FileState(it) }
 
     private fun poll() {
         try {

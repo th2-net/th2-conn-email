@@ -17,8 +17,16 @@ package com.exactpro.th2.email.loader
 
 import java.util.Date
 
-interface TimeLoader {
-    fun loadLastProcessedMessageReceiveDate(sessionAlias: String): Date?
-    fun updateState(sessionAlias: String, fileState: FileState)
-    fun writeState()
+class FileTimeLoader(private val stateFilePath: String): TimeLoader {
+    private val state = FilesState.load(stateFilePath).states.toMutableMap()
+
+    override fun loadLastProcessedMessageReceiveDate(sessionAlias: String): Date? = state[sessionAlias]?.lastProcessedMessageDate
+
+    override fun updateState(sessionAlias: String, fileState: FileState) {
+        state[sessionAlias] = fileState
+    }
+
+    override fun writeState() {
+        FilesState.write(stateFilePath, state)
+    }
 }

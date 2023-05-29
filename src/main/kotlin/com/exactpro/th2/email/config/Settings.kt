@@ -18,9 +18,15 @@ package com.exactpro.th2.email.config
 data class Settings(
     val clients: List<ClientSettings>,
     val maxFlushTime: Long = 1000,
-    val maxBatchSize: Int = 1000
+    val maxBatchSize: Int = 1000,
+    val loadStateFromCradle: Boolean = false,
+    val loadStateFromFile: Boolean = true,
+    val stateFilePath: String = "state.json"
 ) {
     init {
         require(clients.isNotEmpty()) { "At least one client should be described." }
+        if(loadStateFromCradle && loadStateFromFile) {
+            error("It is only possible to load state from one place: file or cradle.")
+        }
     }
 }
