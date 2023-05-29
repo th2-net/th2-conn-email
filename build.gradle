@@ -96,3 +96,19 @@ compileTestKotlin {
         jvmTarget = '11'
     }
 }
+
+dependencyCheck {
+    formats=['SARIF', 'JSON', 'HTML']
+    failBuildOnCVSS=5
+    suppressionFile="suppressions.xml"
+
+    analyzers {
+        assemblyEnabled = false
+        nugetconfEnabled = false
+        nodeEnabled = false
+    }
+}
+
+dependencyLocking {
+    lockAllConfigurations()
+}
