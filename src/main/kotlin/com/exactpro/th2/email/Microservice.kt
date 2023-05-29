@@ -22,19 +22,23 @@ import com.exactpro.th2.common.schema.factory.CommonFactory
 import com.exactpro.th2.common.schema.message.QueueAttribute
 import com.exactpro.th2.common.utils.message.RawMessageBatcher
 import com.exactpro.th2.common.utils.message.sessionAlias
+import com.exactpro.th2.dataprovider.lw.grpc.DataProviderService
 import com.exactpro.th2.email.api.IReceiver
 import com.exactpro.th2.email.api.impl.IMAPSessionProvider
 import com.exactpro.th2.email.api.impl.POP3SessionProvider
 import com.exactpro.th2.email.api.impl.SMTPSessionProvider
 import com.exactpro.th2.email.config.ReceiverType
 import com.exactpro.th2.email.config.Settings
+import com.exactpro.th2.email.loader.TimeLoader
 import com.fasterxml.jackson.databind.json.JsonMapper
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.google.protobuf.ByteString
 import jakarta.mail.Message
 import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
+import java.util.*
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -45,9 +49,6 @@ import kotlin.system.exitProcess
 import mu.KotlinLogging
 
 private val LOGGER = KotlinLogging.logger { }
-
-const val SUBJECT_PROPERTY = "Subject"
-const val FROM_PROPERTY = "From"
 
 fun main(args: Array<String>) = try {
     val resources = ConcurrentLinkedDeque<Pair<String, () -> Unit>>()
@@ -71,6 +72,7 @@ fun main(args: Array<String>) = try {
 
     val mapper = JsonMapper.builder()
         .addModule(KotlinModule.Builder().configure(KotlinFeature.NullIsSameAsDefault, true).build())
+        .addModule(JavaTimeModule())
         .build()
 
     val settings = factory.getCustomConfiguration(Settings::class.java, mapper)
@@ -98,10 +100,18 @@ fun main(args: Array<String>) = try {
         messageRouter.sendAll(it, QueueAttribute.RAW.name)
     }
 
+    val dataProviderService = if(settings.clients.any { it.receiver.loadDatesFromCradle }) {
+        val grpcRouter = factory.grpcRouter
+        resources += "grpc router" to grpcRouter::close
+        grpcRouter.getService(DataProviderService::class.java)
+    } else null
+
     val rootEventId = toEventID(factory.rootEventId)
 
     val sendHandlers = mutableMapOf<String, (RawMessage) -> Unit>()
     val receivers = mutableMapOf<String, IReceiver>()
+
+    val timeLoader = dataProviderService?.let { TimeLoader(dataProviderService) }
 
     for(client in settings.clients) {
         val handler: (Message) -> Unit = {
@@ -119,7 +129,15 @@ fun main(args: Array<String>) = try {
             }
         }
 
-        val receiver = when(client.receiver.type) {
+        val dateLoader: () -> Date? = {
+            if (client.receiver.loadDatesFromCradle) {
+                timeLoader?.loadLastProcessedMessageReceiveDate(client.sessionAlias)
+            } else {
+                null
+            }
+        }
+
+        val receiver = when (client.receiver.type) {
             ReceiverType.IMAP.alias -> {
                 val sessionProvider = IMAPSessionProvider(client.receiver.sessionConfiguration)
                 val authenticator = client.receiver.authSettings.authenticator()
@@ -127,7 +145,8 @@ fun main(args: Array<String>) = try {
                     sessionProvider.getSession(authenticator),
                     handler,
                     client.receiver,
-                    receiverExecutor
+                    receiverExecutor,
+                    dateLoader
                 ) {
                     eventRouter.sendAll(it.toBatchProto(rootEventId))
                 }
@@ -139,7 +158,8 @@ fun main(args: Array<String>) = try {
                     sessionProvider.getSession(authenticator),
                     handler,
                     client.receiver,
-                    receiverExecutor
+                    receiverExecutor,
+                    dateLoader
                 ) {
                     eventRouter.sendAll(it.toBatchProto(rootEventId))
                 }
@@ -152,7 +172,7 @@ fun main(args: Array<String>) = try {
 
         val sender = SMTPSender(senderSessionProvider.getSession(senderAuth), client.sender.reconnectInterval)
 
-        val send:(RawMessage) -> Unit = {
+        val send: (RawMessage) -> Unit = {
             val message = MimeMessage(sender.session)
             message.setFrom(InternetAddress(client.from))
             message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(client.to))
@@ -189,16 +209,5 @@ fun main(args: Array<String>) = try {
 } catch (e: Exception) {
     LOGGER.error(e) { "Uncaught exception. Shutting down" }
     exitProcess(1)
-}
-
-fun Message.toRawMessage(sessionAlias: String): RawMessage.Builder = RawMessage.newBuilder().apply {
-    metadataBuilder.putAllProperties(
-        mapOf(
-            SUBJECT_PROPERTY to this@toRawMessage.subject,
-            FROM_PROPERTY to (this@toRawMessage.from.firstOrNull()?.toString() ?: "")
-        ),
-    )
-    this.sessionAlias = sessionAlias
-    this.body = ByteString.copyFrom(this@toRawMessage.content.toString().toByteArray(Charsets.UTF_8))
 }
 

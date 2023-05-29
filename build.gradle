@@ -48,6 +48,7 @@ dependencies {
 
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: kotlin_version
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect', version: kotlin_version
+    implementation 'com.exactpro.th2:grpc-lw-data-provider:1.0.0-dev-version-1.2+'
 
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.14.1'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: '2.14.1'

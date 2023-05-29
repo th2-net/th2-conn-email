@@ -23,8 +23,12 @@ import jakarta.mail.Message
 import jakarta.mail.Service
 import jakarta.mail.Session
 import java.lang.Integer.min
+import java.text.DateFormat
+import java.text.ParseException
+import java.util.*
 import java.util.concurrent.ExecutorService
 import org.eclipse.angus.mail.imap.IMAPFolder
+import org.eclipse.angus.mail.imap.IMAPMessage
 import org.eclipse.angus.mail.imap.IMAPStore
 
 class IMAPReceiver(
@@ -32,31 +36,41 @@ class IMAPReceiver(
     private val handler: (Message) -> Unit,
     private val receiverConfig: ReceiverConfig,
     private val executorService: ExecutorService,
+    private val getLastProcessedDate: () -> Date?,
     private val sendEvent: (Event) -> Unit
 ): IReceiver {
     override val service: Service = session.store
-    private val store = service as IMAPStore
+    private val store = (service as IMAPStore).apply {
+        addConnectionListener(ReceiverConnectionListener(
+            this@IMAPReceiver,
+            receiverConfig.reconnectInterval,
+            sendEvent,
+            executorService
+        ))
+    }
+    private lateinit var folder: IMAPFolder
+    private val emailListener = EmailListener(handler)
+    private var lastProcessedMessageDate: Date? = getLastProcessedDate()
 
     @Volatile private var isRunning = true
 
     override fun start() {
-        store.addConnectionListener(
-            ReceiverConnectionListener(
-                this,
-                receiverConfig.reconnectInterval,
-                sendEvent,
-                executorService
-            )
-        )
         store.connect()
+        isRunning = true
+        folder = store.getFolder(receiverConfig.folder) as IMAPFolder
     }
 
     override fun subscribe() {
-        // TODO: Think about filtering messages handled on previous iterations
-        val folder = store.getFolder(receiverConfig.folder) as IMAPFolder
-        folder.open(Folder.READ_ONLY)
+        if(!folder.isOpen) folder.open(Folder.READ_ONLY)
 
-        var rangeStart = 1
+        val resumeDate = resumeDate(lastProcessedMessageDate, receiverConfig.startProcessingAtLeastFrom)
+        val resumeMessage = if(resumeDate == null) {
+            1
+        } else {
+            findResumeMessageNumber(folder, resumeDate) ?: 1
+        }
+
+        var rangeStart = resumeMessage
         var rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
 
         while (rangeEnd <= folder.messageCount) {
@@ -67,13 +81,14 @@ class IMAPReceiver(
             }
             for (message in messages) {
                 handler(message)
+                message.date()?.let { lastProcessedMessageDate = it }
             }
             if(rangeEnd == folder.messageCount) break
             rangeStart = rangeEnd
             rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
         }
 
-        folder.addMessageCountListener(EmailListener(handler))
+        folder.addMessageCountListener(emailListener)
 
         while (isRunning) {
             folder.idle()
@@ -83,7 +98,32 @@ class IMAPReceiver(
         service.close()
     }
 
+    private fun findResumeMessageNumber(folder: Folder, previousDate: Date): Int? {
+        var low = 1
+        var high = folder.messageCount
+        var resumeMessageNumber: Int? = null
+
+        while (low <= high) {
+            val mid = (low + high) / 2
+            val message = folder.getMessage(mid) as IMAPMessage
+
+            val messageDate = message.date()
+
+            if (messageDate != null && messageDate.after(previousDate)) {
+                resumeMessageNumber = mid
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+
+        return resumeMessageNumber
+    }
+
     override fun stop() {
         isRunning = false
+        folder.removeMessageCountListener(emailListener)
+        if(folder.isOpen) folder.close()
+        store.close()
     }
 }

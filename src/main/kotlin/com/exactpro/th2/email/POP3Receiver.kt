@@ -23,8 +23,11 @@ import jakarta.mail.Message
 import jakarta.mail.Service
 import jakarta.mail.Session
 import java.lang.Integer.min
+import java.util.*
 import java.util.concurrent.ExecutorService
+import mu.KotlinLogging
 import org.eclipse.angus.mail.pop3.POP3Folder
+import org.eclipse.angus.mail.pop3.POP3Message
 import org.eclipse.angus.mail.pop3.POP3Store
 
 
@@ -33,94 +36,115 @@ class POP3Receiver(
     private val handler: (Message) -> Unit,
     private val receiverConfig: ReceiverConfig,
     private val executor: ExecutorService,
+    private val getLastProcessedDate: () -> Date?,
     private val sendEvent: (Event) -> Unit
 ): IReceiver {
     init {
         check(receiverConfig.folder == "INBOX") { "Only inbox folder is allowed for POP3 receiver." }
     }
     override val service: Service = session.store
-    private val store = service as POP3Store
-    @Volatile private var isRunning = true
-
-    override fun start() {
-        store.addConnectionListener(
+    private var lastSeenMessageCount: Int = 0
+    private lateinit var folder: POP3Folder
+    private val store = (service as POP3Store).apply {
+        addConnectionListener(
             ReceiverConnectionListener(
-                this,
+                this@POP3Receiver,
                 receiverConfig.reconnectInterval,
                 sendEvent,
                 executor
             )
         )
+    }
+    @Volatile private var isRunning = true
+    private var lastProcessedMessageDate: Date? = getLastProcessedDate()
+
+    override fun start() {
         store.connect()
+        folder = store.getFolder(receiverConfig.folder) as POP3Folder
+        isRunning = true
     }
 
     override fun subscribe() {
-        // TODO: Think about how to filter messages handled on previous iterations
-        val folder = store.getFolder(receiverConfig.folder) as POP3Folder
-        folder.open(Folder.READ_ONLY)
-
-        var rangeStart = 1
-        var rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
-
-        var lastProcessedMessageNumber = 0
-
-        while (rangeEnd <= folder.messageCount) {
-            val messages = if(rangeEnd - rangeStart <= 1) {
-                arrayOf(folder.getMessage(rangeEnd))
-            } else {
-                folder.getMessages(rangeStart, rangeEnd)
-            }
-
-            for (message in messages) {
-                handler(message)
-                lastProcessedMessageNumber = message.messageNumber
-            }
-            if(rangeEnd == folder.messageCount) break
-            rangeStart = rangeEnd
-            rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
-        }
-
-        folder.close()
-
         while (isRunning) {
-            val folder = store.getFolder(receiverConfig.folder) as POP3Folder
-            folder.open(Folder.READ_ONLY)
-            lastProcessedMessageNumber = poll(lastProcessedMessageNumber, folder, handler)
-            folder.close()
+            poll()
             Thread.sleep(receiverConfig.pollInterval)
         }
-
-        folder.close()
         service.close()
     }
 
-    private fun poll(lastProcessed: Int, folder: POP3Folder, handler: (Message) -> Unit): Int {
-        // TODO: That is bad solution for retreiving new messages. Think about how to filter messages handled on previous iterations
-        if(lastProcessed == folder.messageCount) return lastProcessed
-        var lastProcessedMessageNumber = lastProcessed
-        var rangeStart = lastProcessed
-        var rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
+    private fun poll() {
+        try {
+            if(!folder.isOpen) folder.open(Folder.READ_ONLY)
+            if(folder.messageCount < 0) return
 
-        while (rangeEnd <= folder.messageCount) {
-            val messages = if(rangeEnd - rangeStart <= 1) {
-                arrayOf(folder.getMessage(rangeEnd))
+            val resumeDate = resumeDate(lastProcessedMessageDate, receiverConfig.startProcessingAtLeastFrom)
+            val resumeMessage = if(resumeDate == null) {
+                1
             } else {
-                folder.getMessages(rangeStart, rangeEnd)
+                findResumeMessageNumber(folder, resumeDate) ?: 1
             }
 
-            for (message in messages) {
-                handler(message)
-                lastProcessedMessageNumber = message.messageNumber
+            if(resumeMessage == lastSeenMessageCount) return
+            lastSeenMessageCount = folder.messageCount
+
+            var rangeStart = resumeMessage
+            var rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
+
+            while (rangeEnd <= folder.messageCount) {
+                val messages = if(rangeEnd - rangeStart <= 1) {
+                    arrayOf(folder.getMessage(rangeEnd))
+                } else {
+                    folder.getMessages(rangeStart, rangeEnd)
+                }
+
+                for (message in messages) {
+                    handler(message)
+                    message?.date()?.let { lastProcessedMessageDate = it }
+                }
+                if(rangeEnd == folder.messageCount) break
+                rangeStart = rangeEnd
+                rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
             }
-            if(rangeEnd == folder.messageCount) break
-            rangeStart = rangeEnd
-            rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
+
+            folder.close()
+        } catch (e: Exception) {
+            K_LOGGER.error(e) { "Error while polling." }
+        }
+    }
+
+    private fun findResumeMessageNumber(folder: Folder, previousDate: Date): Int? {
+        var low = 1
+        var high = folder.messageCount
+        var resumeMessageNumber: Int? = null
+
+        while (low <= high) {
+            val mid = (low + high) / 2
+            val message = folder.getMessage(mid) as POP3Message
+
+            val messageDate = message.date()
+
+            if (messageDate != null && messageDate.after(previousDate)) {
+                resumeMessageNumber = mid
+                high = mid - 1
+            } else if(messageDate != null && messageDate.before(previousDate)) {
+                low = mid + 1
+            } else {
+                resumeMessageNumber = mid
+                low = mid + 1
+            }
         }
 
-        return lastProcessedMessageNumber
+        return resumeMessageNumber
     }
 
     override fun stop() {
         isRunning = false
+        Thread.sleep(receiverConfig.pollInterval)
+        if(folder.isOpen) folder.close()
+        store.close()
+    }
+
+    companion object {
+        private val K_LOGGER = KotlinLogging.logger {  }
     }
 }

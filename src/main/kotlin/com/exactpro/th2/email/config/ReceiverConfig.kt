@@ -15,6 +15,9 @@
  */
 package com.exactpro.th2.email.config
 
+import com.fasterxml.jackson.annotation.JsonFormat
+import java.util.*
+
 data class ReceiverConfig(
     val type: String = "pop3",
     val sessionConfiguration: BaseSessionSettings = BaseSessionSettings(),
@@ -22,7 +25,10 @@ data class ReceiverConfig(
     val folder: String = "INBOX",
     val fetchCount: Int = 1000,
     val reconnectInterval: Long = 1000,
-    val pollInterval: Long = 1000
+    val pollInterval: Long = 1000,
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+    val startProcessingAtLeastFrom: Date? = Date(Long.MIN_VALUE),
+    val loadDatesFromCradle: Boolean = false
 ) {
     init {
         require(type in ReceiverType.aliases()) { "Invalid type ${type}. Type should be one of the following: ${ReceiverType.aliases()}" }
