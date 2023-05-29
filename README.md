@@ -28,7 +28,7 @@ This conn can send emails via smtp and retreives emails via pop3/imap
 + *fetchCount* - Specifies the maximum number of messages to fetch in a single retrieval. The default value is 1000.
 + *reconnectInterval* - Specifies the interval (in milliseconds) at which the receiver will attempt to reconnect to the server if a connection is lost. The default value is 1000 milliseconds (1 second).
 + *pollInterval* - Specifies the interval (in milliseconds) at which the receiver will poll the server for new messages. The default value is 1000 milliseconds (1 second).
-+ *startProcessingAtLeastFrom* - Date from which messages should be processed. Format: [yyyy-MM-dd'T'HH:mm:ss.SSSZ]. Can be null.
++ *startProcessingAtLeastFrom* - Date from which messages should be processed. Format: [yyyy-MM-dd'T'HH:mm:ss]. Can be null.
 + *loadDatesFromCradle* - Specifies if receiver should use date from last processed message in cradle to resume processing where stopped last time.
 
 ### Session configuration

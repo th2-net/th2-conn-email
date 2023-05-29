@@ -30,6 +30,7 @@ import jakarta.mail.PasswordAuthentication
 import jakarta.mail.Session
 import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
+import java.time.LocalDateTime
 import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -76,7 +77,7 @@ class TestReceiver {
         transport.sendMessage(msg, msg.allRecipients)
 
 
-        val receiver = POP3Receiver(pop3Session(), handler, ReceiverConfig(), Executors.newSingleThreadExecutor(), {lastProcessedDate}) {}
+        val receiver = POP3Receiver(pop3Session(), handler, ReceiverConfig(pollInterval = 1000), Executors.newSingleThreadExecutor(), {lastProcessedDate}) {}
         receiver.start()
 
         oneMessageLatch.await(10, TimeUnit.SECONDS)
@@ -94,6 +95,7 @@ class TestReceiver {
         twoMessagesLatch.await(10, TimeUnit.SECONDS)
 
         receiver.stop()
+        Thread.sleep(1000)
 
         val msg3: Message = MimeMessage(smtpSession)
         msg3.setFrom(InternetAddress("user@noreply.com"))

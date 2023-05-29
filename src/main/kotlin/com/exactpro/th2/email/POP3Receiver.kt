@@ -22,6 +22,7 @@ import jakarta.mail.Folder
 import jakarta.mail.Message
 import jakarta.mail.Service
 import jakarta.mail.Session
+import java.lang.Integer.max
 import java.lang.Integer.min
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -43,29 +44,22 @@ class POP3Receiver(
         check(receiverConfig.folder == "INBOX") { "Only inbox folder is allowed for POP3 receiver." }
     }
     override val service: Service = session.store
-    private var lastSeenMessageCount: Int = 0
-    private lateinit var folder: POP3Folder
-    private val store = (service as POP3Store).apply {
-        addConnectionListener(
-            ReceiverConnectionListener(
-                this@POP3Receiver,
-                receiverConfig.reconnectInterval,
-                sendEvent,
-                executor
-            )
-        )
-    }
+    private val store = service as POP3Store
     @Volatile private var isRunning = true
     private var lastProcessedMessageDate: Date? = getLastProcessedDate()
+    private var lastSeenMessageCount: Int = 0
 
     override fun start() {
-        store.connect()
-        folder = store.getFolder(receiverConfig.folder) as POP3Folder
         isRunning = true
+        executor.submit {
+            K_LOGGER.info { "Started POP3 listener." }
+            subscribe()
+        }
     }
 
     override fun subscribe() {
         while (isRunning) {
+            K_LOGGER.info { "Polling ${receiverConfig.folder} for new messages." }
             poll()
             Thread.sleep(receiverConfig.pollInterval)
         }
@@ -74,18 +68,20 @@ class POP3Receiver(
 
     private fun poll() {
         try {
+            if(!store.isConnected) store.connect()
+            val folder = store.getFolder(receiverConfig.folder)
             if(!folder.isOpen) folder.open(Folder.READ_ONLY)
             if(folder.messageCount < 0) return
+
+            if(lastSeenMessageCount == folder.messageCount) return
+            lastSeenMessageCount = folder.messageCount
 
             val resumeDate = resumeDate(lastProcessedMessageDate, receiverConfig.startProcessingAtLeastFrom)
             val resumeMessage = if(resumeDate == null) {
                 1
             } else {
-                findResumeMessageNumber(folder, resumeDate) ?: 1
+                findResumeMessageNumber(folder, resumeDate) ?: return
             }
-
-            if(resumeMessage == lastSeenMessageCount) return
-            lastSeenMessageCount = folder.messageCount
 
             var rangeStart = resumeMessage
             var rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
@@ -117,6 +113,9 @@ class POP3Receiver(
         var high = folder.messageCount
         var resumeMessageNumber: Int? = null
 
+        var nearestMessageNumberTop: Int? = null
+        var nearestMessageNumberBottom: Int? = null
+
         while (low <= high) {
             val mid = (low + high) / 2
             val message = folder.getMessage(mid) as POP3Message
@@ -124,13 +123,36 @@ class POP3Receiver(
             val messageDate = message.date()
 
             if (messageDate != null && messageDate.after(previousDate)) {
-                resumeMessageNumber = mid
+                nearestMessageNumberTop = mid
                 high = mid - 1
-            } else if(messageDate != null && messageDate.before(previousDate)) {
-                low = mid + 1
             } else {
-                resumeMessageNumber = mid
+                nearestMessageNumberBottom = mid
                 low = mid + 1
+            }
+        }
+
+
+        if(nearestMessageNumberBottom == null && nearestMessageNumberTop == null) return null
+
+        if(nearestMessageNumberTop != null) {
+            while (nearestMessageNumberTop > 0) {
+                val message = folder.getMessage(nearestMessageNumberTop)
+                val messageDate = message.date() ?: continue
+                if(messageDate.before(previousDate) || messageDate == previousDate) break
+                resumeMessageNumber = nearestMessageNumberTop
+                nearestMessageNumberTop -= 1
+            }
+
+            return resumeMessageNumber
+        }
+
+        if(nearestMessageNumberBottom != null) {
+            while (nearestMessageNumberBottom < folder.messageCount + 1) {
+                val message = folder.getMessage(nearestMessageNumberBottom)
+                val messageDate = message.date() ?: continue
+                if(messageDate.after(previousDate)) break
+                resumeMessageNumber = nearestMessageNumberBottom
+                nearestMessageNumberBottom += 1
             }
         }
 
@@ -139,9 +161,8 @@ class POP3Receiver(
 
     override fun stop() {
         isRunning = false
-        Thread.sleep(receiverConfig.pollInterval)
-        if(folder.isOpen) folder.close()
-        store.close()
+        Thread.sleep(receiverConfig.reconnectInterval)
+        if(store.isConnected) store.close()
     }
 
     companion object {

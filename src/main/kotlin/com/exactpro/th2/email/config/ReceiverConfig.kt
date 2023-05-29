@@ -25,8 +25,8 @@ data class ReceiverConfig(
     val folder: String = "INBOX",
     val fetchCount: Int = 1000,
     val reconnectInterval: Long = 1000,
-    val pollInterval: Long = 1000,
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+    val pollInterval: Long = 60000,
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     val startProcessingAtLeastFrom: Date? = Date(Long.MIN_VALUE),
     val loadDatesFromCradle: Boolean = false
 ) {

@@ -18,10 +18,12 @@ package com.exactpro.th2.email
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.email.api.IReceiver
 import com.exactpro.th2.email.config.ReceiverConfig
+import io.netty.handler.codec.http.HttpHeaders.getHeader
 import jakarta.mail.Folder
 import jakarta.mail.Message
 import jakarta.mail.Service
 import jakarta.mail.Session
+import java.lang.Integer.max
 import java.lang.Integer.min
 import java.text.DateFormat
 import java.text.ParseException
@@ -67,7 +69,7 @@ class IMAPReceiver(
         val resumeMessage = if(resumeDate == null) {
             1
         } else {
-            findResumeMessageNumber(folder, resumeDate) ?: 1
+            findResumeMessageNumber(folder, resumeDate) ?: return
         }
 
         var rangeStart = resumeMessage
@@ -103,6 +105,9 @@ class IMAPReceiver(
         var high = folder.messageCount
         var resumeMessageNumber: Int? = null
 
+        var nearestMessageNumberTop: Int? = null
+        var nearestMessageNumberBottom: Int? = null
+
         while (low <= high) {
             val mid = (low + high) / 2
             val message = folder.getMessage(mid) as IMAPMessage
@@ -110,10 +115,36 @@ class IMAPReceiver(
             val messageDate = message.date()
 
             if (messageDate != null && messageDate.after(previousDate)) {
-                resumeMessageNumber = mid
+                nearestMessageNumberTop = mid
                 high = mid - 1
             } else {
+                nearestMessageNumberBottom = mid
                 low = mid + 1
+            }
+        }
+
+
+        if(nearestMessageNumberBottom == null && nearestMessageNumberTop == null) return null
+
+        if(nearestMessageNumberTop != null) {
+            while (nearestMessageNumberTop > 0) {
+                val message = folder.getMessage(nearestMessageNumberTop)
+                val messageDate = message.date() ?: continue
+                if(messageDate.before(previousDate) || messageDate == previousDate) break
+                resumeMessageNumber = nearestMessageNumberTop
+                nearestMessageNumberTop -= 1
+            }
+
+            return resumeMessageNumber
+        }
+
+        if(nearestMessageNumberBottom != null) {
+            while (nearestMessageNumberBottom < folder.messageCount + 1) {
+                val message = folder.getMessage(nearestMessageNumberBottom)
+                val messageDate = message.date() ?: continue
+                if(messageDate.after(previousDate)) break
+                resumeMessageNumber = nearestMessageNumberBottom
+                nearestMessageNumberBottom += 1
             }
         }
 

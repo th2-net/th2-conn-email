@@ -18,7 +18,6 @@ package com.exactpro.th2.email
 import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.sessionAlias
 import com.exactpro.th2.email.config.CertificateInfo
-import com.exactpro.th2.email.config.ReceiverConfig
 import com.google.protobuf.ByteString
 import jakarta.mail.Message
 import java.io.File
@@ -26,7 +25,6 @@ import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
-import java.text.DateFormat
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.*
@@ -48,13 +46,13 @@ fun resumeDate(lastProcessedDate: Date?, configDate: Date?) =
         } else {
             configDate
         }
-    } else lastProcessedDate
+    } else lastProcessedDate ?: configDate
 
-fun Message.date(): Date? = try {
+fun Message.date(): Date? = receivedDate ?: try {
     getHeader(DATE_HEADER)?.get(0)?.let { DATE_FORMAT.parse(it) }
-    } catch (e: ParseException) {
-        null
-    }
+} catch (e: ParseException) {
+    sentDate
+}
 
 fun Message.toRawMessage(sessionAlias: String): RawMessage.Builder = RawMessage.newBuilder().apply {
     val messageDate = date()?.time?.toString()

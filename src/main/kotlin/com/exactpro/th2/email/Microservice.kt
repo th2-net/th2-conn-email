@@ -34,7 +34,6 @@ import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.google.protobuf.ByteString
 import jakarta.mail.Message
 import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
@@ -161,7 +160,7 @@ fun main(args: Array<String>) = try {
                     receiverExecutor,
                     dateLoader
                 ) {
-                    eventRouter.sendAll(it.toBatchProto(rootEventId))
+                    /*eventRouter.sendAll(it.toBatchProto(rootEventId))*/
                 }
             }
             else -> error("Unknown receiver type: ${client.receiver.type}")
