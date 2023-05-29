@@ -20,7 +20,7 @@ import com.exactpro.th2.email.config.BaseSessionSettings
 import com.exactpro.th2.email.getCustomFactory
 import jakarta.mail.Authenticator
 import jakarta.mail.Session
-import java.util.*
+import java.util.Properties
 
 class SMTPSessionProvider(private val sessionSettings: BaseSessionSettings): SessionProvider {
 

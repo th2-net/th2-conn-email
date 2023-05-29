@@ -17,13 +17,10 @@ package com.exactpro.th2.email
 
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.email.api.IReceiver
-import jakarta.mail.AuthenticationFailedException
 import jakarta.mail.event.ConnectionEvent
 import jakarta.mail.event.ConnectionListener
-import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import mu.KotlinLogging
-import org.slf4j.ILoggerFactory
 
 class ReceiverConnectionListener(
     private val receiver: IReceiver,

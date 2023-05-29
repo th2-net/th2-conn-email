@@ -16,6 +16,8 @@
 package com.exactpro.th2.email
 
 import com.exactpro.th2.common.event.EventUtils.toEventID
+import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.schema.factory.CommonFactory
@@ -37,7 +39,7 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule
 import jakarta.mail.Message
 import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
-import java.util.*
+import java.util.Date
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -96,7 +98,7 @@ fun main(args: Array<String>) = try {
         batchSelector = { it.sessionAlias to it.direction },
         batcherExecutor,
     ) {
-        messageRouter.sendAll(it, QueueAttribute.RAW.name)
+        messageRouter.sendAll(it, QueueAttribute.RAW.name, QueueAttribute.PUBLISH.name)
     }
 
     val dataProviderService = if(settings.clients.any { it.receiver.loadDatesFromCradle }) {
@@ -113,8 +115,13 @@ fun main(args: Array<String>) = try {
     val timeLoader = dataProviderService?.let { TimeLoader(dataProviderService) }
 
     for(client in settings.clients) {
+        val connectionId = ConnectionID.newBuilder().apply {
+            sessionAlias = client.sessionAlias
+            sessionGroup = client.sessionAlias
+        }.build()
+
         val handler: (Message) -> Unit = {
-            messageBatcher.onMessage(it.toRawMessage(client.sessionAlias))
+            messageBatcher.onMessage(it.toRawMessage(connectionId, Direction.FIRST))
         }
 
         val receiverExecutor = Executors.newSingleThreadExecutor().apply {
@@ -160,7 +167,7 @@ fun main(args: Array<String>) = try {
                     receiverExecutor,
                     dateLoader
                 ) {
-                    /*eventRouter.sendAll(it.toBatchProto(rootEventId))*/
+                    eventRouter.sendAll(it.toBatchProto(rootEventId))
                 }
             }
             else -> error("Unknown receiver type: ${client.receiver.type}")
@@ -178,7 +185,7 @@ fun main(args: Array<String>) = try {
             message.setText(it.body.toString(Charsets.UTF_8))
             message.subject = it.metadata.propertiesMap[SUBJECT_PROPERTY]
             sender.send(message)
-            messageBatcher.onMessage(message.toRawMessage(client.sessionAlias))
+            messageBatcher.onMessage(message.toRawMessage(connectionId, Direction.SECOND))
         }
 
         receivers[client.sessionAlias] = receiver

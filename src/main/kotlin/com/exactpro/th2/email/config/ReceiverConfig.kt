@@ -16,7 +16,7 @@
 package com.exactpro.th2.email.config
 
 import com.fasterxml.jackson.annotation.JsonFormat
-import java.util.*
+import java.util.Date
 
 data class ReceiverConfig(
     val type: String = "pop3",

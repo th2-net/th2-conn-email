@@ -19,13 +19,11 @@ import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils.toEventID
 import com.exactpro.th2.common.grpc.AnyMessage
 import com.exactpro.th2.common.grpc.EventBatch
-import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageGroup
 import com.exactpro.th2.common.grpc.MessageGroupBatch
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.sessionAlias
-import com.exactpro.th2.common.message.sessionGroup
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.storeEvent
 import mu.KotlinLogging

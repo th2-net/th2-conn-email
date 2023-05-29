@@ -20,15 +20,9 @@ import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.grpc.AnyMessage
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.grpc.MessageGroup
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RawMessage
-import com.exactpro.th2.common.message.plusAssign
-import com.exactpro.th2.common.message.sessionAlias
 import com.exactpro.th2.common.message.toJson
-import com.google.protobuf.ByteString
-import io.netty.buffer.ByteBuf
-import io.netty.buffer.Unpooled
 import org.apache.commons.lang3.exception.ExceptionUtils
 
 fun String.toErrorEvent(cause: Throwable? = null): Event = toEvent(Event.Status.FAILED, cause)

@@ -9,6 +9,8 @@ import com.exactpro.th2.dataprovider.lw.grpc.MessageSearchResponse
 import com.exactpro.th2.dataprovider.lw.grpc.MessageStream
 import com.exactpro.th2.dataprovider.lw.grpc.TimeRelation
 import com.exactpro.th2.email.DATE_PROPERTY
+import com.google.protobuf.Timestamp
+import com.google.protobuf.util.Timestamps
 import io.grpc.Context
 import java.time.Instant
 import java.util.*
@@ -38,13 +40,13 @@ class TimeLoader(val dataProvider: DataProviderService) {
     private fun createSearchRequest(sessionAlias: String) =
         MessageSearchRequest.newBuilder().apply {
             startTimestamp = Instant.now().toTimestamp()
-            endTimestamp = Instant.MIN.toTimestamp()
+            endTimestamp = Timestamps.MIN_VALUE
             searchDirection = TimeRelation.PREVIOUS
             addResponseFormats(BASE_64_FORMAT)
             addStream(
                 MessageStream.newBuilder()
                     .setName(sessionAlias)
-                    .setDirection(Direction.SECOND)
+                    .setDirection(Direction.FIRST)
             )
         }.build()
 

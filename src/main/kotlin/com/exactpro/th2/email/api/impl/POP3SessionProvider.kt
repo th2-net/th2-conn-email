@@ -20,7 +20,7 @@ import com.exactpro.th2.email.config.BaseSessionSettings
 import com.exactpro.th2.email.getCustomFactory
 import jakarta.mail.Authenticator
 import jakarta.mail.Session
-import java.util.*
+import java.util.Properties
 
 class POP3SessionProvider(private val sessionSettings: BaseSessionSettings): SessionProvider {
 

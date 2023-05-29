@@ -15,8 +15,11 @@
  */
 package com.exactpro.th2.email
 
+import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RawMessage
-import com.exactpro.th2.common.message.sessionAlias
+import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.email.config.CertificateInfo
 import com.google.protobuf.ByteString
 import jakarta.mail.Message
@@ -27,7 +30,11 @@ import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
 import java.text.ParseException
 import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import javax.net.SocketFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
@@ -54,19 +61,30 @@ fun Message.date(): Date? = receivedDate ?: try {
     sentDate
 }
 
-fun Message.toRawMessage(sessionAlias: String): RawMessage.Builder = RawMessage.newBuilder().apply {
+val generateSequence = Instant.now().run {
+    AtomicLong(TimeUnit.SECONDS.toNanos(epochSecond) + nano)
+}::incrementAndGet
+
+fun Message.toRawMessage(connectionId: ConnectionID, direction: Direction): RawMessage.Builder = RawMessage.newBuilder().apply {
     val messageDate = date()?.time?.toString()
     metadataBuilder.putAllProperties(
         mapOf(
-            SUBJECT_PROPERTY to this@toRawMessage.subject,
-            FROM_PROPERTY to this@toRawMessage.from.firstOrNull()?.toString(),
-            DATE_PROPERTY to messageDate,
-            FOLDER_PROPERTY to this@toRawMessage.folder?.toString()
+            SUBJECT_PROPERTY to (this@toRawMessage.subject ?: ""),
+            FROM_PROPERTY to (this@toRawMessage.from.firstOrNull()?.toString() ?: ""),
+            DATE_PROPERTY to (messageDate ?: ""),
+            FOLDER_PROPERTY to (this@toRawMessage.folder?.toString() ?: "")
         ),
     )
-    this.sessionAlias = sessionAlias
+    this.metadataBuilder.id = createId(connectionId, generateSequence())
+    this.direction = direction
     this.body = ByteString.copyFrom(this@toRawMessage.content.toString().toByteArray(Charsets.UTF_8))
 }
+
+fun createId(connectionId: ConnectionID, sequence: Long) = MessageID.newBuilder().apply {
+    this.connectionId = connectionId
+    this.direction = Direction.FIRST
+    this.sequence = sequence
+}.build()
 
 fun Date.string() = time.toString()
 

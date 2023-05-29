@@ -18,16 +18,12 @@ package com.exactpro.th2.email
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.email.api.IReceiver
 import com.exactpro.th2.email.config.ReceiverConfig
-import io.netty.handler.codec.http.HttpHeaders.getHeader
 import jakarta.mail.Folder
 import jakarta.mail.Message
 import jakarta.mail.Service
 import jakarta.mail.Session
-import java.lang.Integer.max
 import java.lang.Integer.min
-import java.text.DateFormat
-import java.text.ParseException
-import java.util.*
+import java.util.Date
 import java.util.concurrent.ExecutorService
 import org.eclipse.angus.mail.imap.IMAPFolder
 import org.eclipse.angus.mail.imap.IMAPMessage

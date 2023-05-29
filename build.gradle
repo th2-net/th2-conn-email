@@ -68,7 +68,7 @@ test {
 }
 
 application {
-    mainClassName 'com.exactpro.th2.MicroserviceKt'
+    mainClassName 'com.exactpro.th2.email.MicroserviceKt'
 }
 
 applicationName = 'service'

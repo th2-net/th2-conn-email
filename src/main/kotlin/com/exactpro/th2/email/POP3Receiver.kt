@@ -22,12 +22,10 @@ import jakarta.mail.Folder
 import jakarta.mail.Message
 import jakarta.mail.Service
 import jakarta.mail.Session
-import java.lang.Integer.max
 import java.lang.Integer.min
-import java.util.*
+import java.util.Date
 import java.util.concurrent.ExecutorService
 import mu.KotlinLogging
-import org.eclipse.angus.mail.pop3.POP3Folder
 import org.eclipse.angus.mail.pop3.POP3Message
 import org.eclipse.angus.mail.pop3.POP3Store
 

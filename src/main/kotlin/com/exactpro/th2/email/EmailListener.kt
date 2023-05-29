@@ -18,7 +18,6 @@ package com.exactpro.th2.email
 import jakarta.mail.Message
 import jakarta.mail.event.MessageCountEvent
 import jakarta.mail.event.MessageCountListener
-import mu.KotlinLogging
 
 class EmailListener(val handler: (Message) -> Unit): MessageCountListener {
     override fun messagesAdded(e: MessageCountEvent) {
