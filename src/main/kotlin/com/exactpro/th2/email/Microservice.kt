@@ -128,6 +128,7 @@ fun main(args: Array<String>) = try {
         }.build()
 
         val handler: (Message) -> Unit = {
+            LOGGER.debug { "Received message: ${it.subject}" }
             messageBatcher.onMessage(it.toRawMessage(connectionId, Direction.FIRST))
         }
 

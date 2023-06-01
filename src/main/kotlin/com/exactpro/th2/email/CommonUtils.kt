@@ -27,6 +27,10 @@ import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.toJson
 import com.google.protobuf.ByteString
+import jakarta.mail.BodyPart
+import jakarta.mail.MessagingException
+import jakarta.mail.internet.MimeMultipart
+import java.io.IOException
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -91,7 +95,7 @@ fun MailMessage.toRawMessage(connectionId: ConnectionID, direction: Direction): 
     )
     this.metadataBuilder.id = createId(connectionId, generateSequence())
     this.direction = direction
-    this.body = ByteString.copyFrom(this@toRawMessage.content.toString().toByteArray(Charsets.UTF_8))
+    this.body = ByteString.copyFrom(this@toRawMessage.text().toByteArray(Charsets.UTF_8))
 }
 
 fun createId(connectionId: ConnectionID, sequence: Long): MessageID = MessageID.newBuilder().apply {
@@ -99,4 +103,37 @@ fun createId(connectionId: ConnectionID, sequence: Long): MessageID = MessageID.
     this.direction = Direction.FIRST
     this.sequence = sequence
 }.build()
+
+
+const val TEXT_PLAIN = "text/plain"
+const val MIME_MULTIPART = "multipart/*"
+
+@Throws(MessagingException::class, IOException::class)
+private fun MailMessage.text(): String {
+    var result: String? = ""
+    if (isMimeType(TEXT_PLAIN)) {
+        result = content.toString()
+    } else if (isMimeType(MIME_MULTIPART)) {
+        val mimeMultipart: MimeMultipart = content as MimeMultipart
+        result = mimeMultipart.text()
+    }
+    return result ?: content.toString()
+}
+
+@Throws(MessagingException::class, IOException::class)
+private fun MimeMultipart.text(): String {
+    val result = StringBuilder()
+    val count: Int = count
+    for (i in 0 until count) {
+        val bodyPart: BodyPart = getBodyPart(i)
+        if (bodyPart.isMimeType("text/plain")) {
+            result.append(bodyPart.content)
+            break
+        } else if (bodyPart.isMimeType("multipart/*")) {
+            val multipart: MimeMultipart = bodyPart.content as MimeMultipart
+            result.append(multipart.text())
+        }
+    }
+    return result.toString()
+}
 
