@@ -19,6 +19,8 @@ import com.exactpro.th2.email.api.MailService
 import jakarta.mail.Message
 import jakarta.mail.Service
 import jakarta.mail.Session
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import mu.KotlinLogging
 import org.eclipse.angus.mail.smtp.SMTPTransport
 
@@ -28,12 +30,11 @@ class SMTPSender(
 ): MailService {
     override val service: Service = session.transport
     private val transport = service as SMTPTransport
+    private val lock = ReentrantLock()
 
-    fun sendBatch(messages: List<Message>) {
-        messages.forEach { send(it) }
-    }
+    fun sendBatch(messages: List<Message>) = lock.withLock { messages.forEach { send(it) } }
 
-    fun send(message: Message) {
+    fun send(message: Message) = lock.withLock {
         ensureOpen()
         try {
             transport.sendMessage(message, message.allRecipients)
