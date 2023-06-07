@@ -15,21 +15,21 @@
  */
 package com.exactpro.th2.email.config
 
+import com.exactpro.th2.email.api.IAuthSettings
+import com.exactpro.th2.email.api.IReceiverAuthSettings
+import com.exactpro.th2.email.filter.Filter
 import com.fasterxml.jackson.annotation.JsonFormat
 import java.util.Date
 
 data class ReceiverConfig(
-    val type: String = "pop3",
+    val type: ReceiverType = ReceiverType.POP3,
     val sessionConfiguration: BaseSessionSettings = BaseSessionSettings(),
-    val authSettings: BasicAuthSettings = BasicAuthSettings(),
+    val authSettings: IReceiverAuthSettings = BasicAuthSettings(),
+    val filters: List<Filter> = emptyList(),
     val folder: String = "INBOX",
     val fetchCount: Int = 1000,
     val reconnectInterval: Long = 1000,
     val pollInterval: Long = 60000,
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssZ")
     val startProcessingAtLeastFrom: Date? = Date(Long.MIN_VALUE)
-) {
-    init {
-        require(type in ReceiverType.aliases()) { "Invalid type ${type}. Type should be one of the following: ${ReceiverType.aliases()}" }
-    }
-}
+)

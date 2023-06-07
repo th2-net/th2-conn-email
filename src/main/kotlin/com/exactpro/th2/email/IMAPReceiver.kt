@@ -18,7 +18,9 @@ package com.exactpro.th2.email
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.email.api.IReceiver
 import com.exactpro.th2.email.config.ReceiverConfig
-import com.exactpro.th2.email.loader.FileState
+import com.exactpro.th2.email.filter.Filter
+import com.exactpro.th2.email.filter.Filter.Companion.allowed
+import com.exactpro.th2.email.loader.FolderState
 import jakarta.mail.Folder
 import jakarta.mail.Message
 import jakarta.mail.Service
@@ -27,7 +29,6 @@ import java.lang.Integer.min
 import java.util.Date
 import java.util.concurrent.ExecutorService
 import org.eclipse.angus.mail.imap.IMAPFolder
-import org.eclipse.angus.mail.imap.IMAPMessage
 import org.eclipse.angus.mail.imap.IMAPStore
 
 class IMAPReceiver(
@@ -47,8 +48,10 @@ class IMAPReceiver(
             executorService
         ))
     }
+    private val filters: List<Filter> = receiverConfig.filters
+    private val emailListener = EmailListener(handler, filters) { lastProcessedMessageDate = it }
+
     private lateinit var folder: IMAPFolder
-    private val emailListener = EmailListener(handler)
     private var lastProcessedMessageDate: Date? = getLastProcessedDate()
 
     @Volatile private var isRunning = true
@@ -79,6 +82,10 @@ class IMAPReceiver(
                 folder.getMessages(rangeStart, rangeEnd)
             }
             for (message in messages) {
+                if(!filters.allowed(message)) {
+                    message.date()?.let { lastProcessedMessageDate = it }
+                    continue
+                }
                 handler(message)
                 message.date()?.let { lastProcessedMessageDate = it }
             }
@@ -97,7 +104,7 @@ class IMAPReceiver(
         service.close()
     }
 
-    override fun getState() = lastProcessedMessageDate?.let { FileState(it) }
+    override fun getState() = lastProcessedMessageDate?.let { FolderState(it) }
 
     override fun stop() {
         isRunning = false

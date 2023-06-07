@@ -13,9 +13,10 @@ This conn can send emails via smtp and retreives emails via pop3/imap
 ## Client settings
 + *sessionAlias* - session alias for incoming/outgoing th2 messages
 + *from* - sender email address.
-+ *to* - receiver email address.
++ *to* - receiver comma separated email addresses.
 + *sender* - sender configuration.
 + *receiver* - receiver configuration.
++ *headersWhiteList* - mime message headers white-list. It is useful when you want to reduce size of raw messages produced by conn. Default value: `[Subject]`
 
 ### Sender configuration
 + *sessionConfiguration* - Represents the configuration settings for the session used by the sender. It includes properties such as the host, port, and other session-specific settings required for establishing a connection.
@@ -24,7 +25,7 @@ This conn can send emails via smtp and retreives emails via pop3/imap
 
 ### Receiver configuration
 
-+ *type* - Specifies the type of receiver. The default value is "pop3". Valid types include "pop3" and "imap".
++ *type* - Specifies the type of receiver. The default value is "POP3". Valid types include "POP3" and "IMAP".
 + *sessionConfiguration* - Represents the configuration settings for the session used by the receiver. It includes properties such as the host, port, and other session-specific settings required for establishing a connection.
 + *authSettings* - Contains the authentication settings for the receiver. It encapsulates information such as the username, password, or any other authentication credentials required to authenticate with the server.
 + *folder* - Specifies the folder name to retrieve messages from. The default value is "INBOX".
@@ -32,6 +33,10 @@ This conn can send emails via smtp and retreives emails via pop3/imap
 + *reconnectInterval* - Specifies the interval (in milliseconds) at which the receiver will attempt to reconnect to the server if a connection is lost. The default value is 1000 milliseconds (1 second).
 + *pollInterval* - Specifies the interval (in milliseconds) at which the receiver will poll the server for new messages. The default value is 1000 milliseconds (1 second).
 + *startProcessingAtLeastFrom* - Date from which messages should be processed. Format: [yyyy-MM-dd'T'HH:mm:ssZ]. Can be null. `Z` denotes timezone. Valid example: `2023-05-30T12:34:56+0000`.
++ *filters* - List of filters for received message.
+
+#### Filter
++ *senderFilter* - comma separated list of sender email addresses. Only messages with sender(s) from this list will be sent to output pin.
 
 ### Session configuration
 + *host* - Specifies the hostname or IP address of the server. The default value is "localhost".

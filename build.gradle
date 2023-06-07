@@ -38,6 +38,8 @@ dependencies {
     implementation 'jakarta.mail:jakarta.mail-api:2.1.2'
     implementation 'org.eclipse.angus:jakarta.mail:2.0.0'
 
+    compileOnly 'com.google.auto.service:auto-service-annotations:1.0.1'
+    kapt 'com.google.auto.service:auto-service:1.0.1'
 
     api platform('com.exactpro.th2:bom:4.2.0')
 
@@ -100,7 +102,6 @@ compileTestKotlin {
 dependencyCheck {
     formats=['SARIF', 'JSON', 'HTML']
     failBuildOnCVSS=5
-    suppressionFile="suppressions.xml"
 
     analyzers {
         assemblyEnabled = false

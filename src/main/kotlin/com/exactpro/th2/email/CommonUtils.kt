@@ -26,12 +26,15 @@ import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.toJson
+import com.exactpro.th2.email.config.ClientSettings
 import com.google.protobuf.ByteString
-import jakarta.mail.BodyPart
-import jakarta.mail.MessagingException
-import jakarta.mail.internet.MimeMultipart
-import java.io.IOException
+import jakarta.mail.Session
+import jakarta.mail.internet.MimeMessage
+import jakarta.mail.internet.MimePartDataSource
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.time.Instant
+import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -83,57 +86,51 @@ val generateSequence = Instant.now().run {
     AtomicLong(TimeUnit.SECONDS.toNanos(epochSecond) + nano)
 }::incrementAndGet
 
-fun MailMessage.toRawMessage(connectionId: ConnectionID, direction: Direction): RawMessage.Builder = RawMessage.newBuilder().apply {
-    val messageDate = date()?.time?.toString()
-    metadataBuilder.putAllProperties(
-        mapOf(
-            SUBJECT_PROPERTY to (this@toRawMessage.subject ?: ""),
-            FROM_PROPERTY to (this@toRawMessage.from.firstOrNull()?.toString() ?: ""),
-            DATE_PROPERTY to (messageDate ?: ""),
-            FOLDER_PROPERTY to (this@toRawMessage.folder?.toString() ?: "")
-        ),
-    )
-    this.metadataBuilder.id = createId(connectionId, generateSequence())
-    this.direction = direction
-    this.body = ByteString.copyFrom(this@toRawMessage.text().toByteArray(Charsets.UTF_8))
-}
-
 fun createId(connectionId: ConnectionID, sequence: Long): MessageID = MessageID.newBuilder().apply {
     this.connectionId = connectionId
     this.direction = Direction.FIRST
     this.sequence = sequence
 }.build()
 
+const val DATE_PROPERTY = "Date"
+const val FOLDER_PROPERTY = "Folder"
+private val defaultSession = Session.getDefaultInstance(Properties(), null)
 
-const val TEXT_PLAIN = "text/plain"
-const val MIME_MULTIPART = "multipart/*"
+fun MailMessage.toRawMessage(
+    connectionId: ConnectionID,
+    direction: Direction,
+    headersWhiteList: Set<String>
+): RawMessage.Builder = RawMessage.newBuilder().apply {
+    val originalMessage = this@toRawMessage
+    val cleanMimeMessage = MimeMessage(defaultSession)
 
-@Throws(MessagingException::class, IOException::class)
-private fun MailMessage.text(): String {
-    var result: String? = ""
-    if (isMimeType(TEXT_PLAIN)) {
-        result = content.toString()
-    } else if (isMimeType(MIME_MULTIPART)) {
-        val mimeMultipart: MimeMultipart = content as MimeMultipart
-        result = mimeMultipart.text()
-    }
-    return result ?: content.toString()
+    originalMessage.allHeaders
+        .asSequence()
+        .filter { headersWhiteList.contains(it.name)}
+        .forEach { cleanMimeMessage.addHeader(it.name, it.value) }
+
+    cleanMimeMessage.setContent(originalMessage.content, originalMessage.contentType)
+
+    val messageDate = originalMessage.date()?.time?.toString()
+
+    metadataBuilder.putAllProperties(
+        mapOf(
+            DATE_PROPERTY to (messageDate ?: ""),
+            FOLDER_PROPERTY to (this@toRawMessage.folder?.toString() ?: "")
+        ),
+    )
+
+    this.metadataBuilder.id = createId(connectionId, generateSequence())
+    this.direction = direction
+    val outputStream = ByteArrayOutputStream()
+    cleanMimeMessage.writeTo(outputStream)
+    this.body = ByteString.copyFrom(outputStream.toByteArray())
 }
 
-@Throws(MessagingException::class, IOException::class)
-private fun MimeMultipart.text(): String {
-    val result = StringBuilder()
-    val count: Int = count
-    for (i in 0 until count) {
-        val bodyPart: BodyPart = getBodyPart(i)
-        if (bodyPart.isMimeType("text/plain")) {
-            result.append(bodyPart.content)
-            break
-        } else if (bodyPart.isMimeType("multipart/*")) {
-            val multipart: MimeMultipart = bodyPart.content as MimeMultipart
-            result.append(multipart.text())
-        }
+fun RawMessage.toMimeMessage(session: Session, client: ClientSettings): MailMessage {
+    val content = body.toByteArray()
+    return MimeMessage(session, ByteArrayInputStream(content)).apply {
+        setFrom(client.fromAddress)
+        setRecipients(MailMessage.RecipientType.TO, client.toAddresses)
     }
-    return result.toString()
 }
-

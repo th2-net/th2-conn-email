@@ -15,6 +15,8 @@
  */
 package com.exactpro.th2.email.loader
 
+import com.exactpro.th2.email.loader.MutableEmailServiceState.Companion.toMutable
+import com.exactpro.th2.email.loader.MutableEmailServiceStates.Companion.toMutable
 import com.fasterxml.jackson.annotation.JsonFormat
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -25,42 +27,76 @@ import java.io.FileOutputStream
 import java.util.Date
 import mu.KotlinLogging
 
-data class FileState(
+class FolderState(
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "EEE, d MMM yyyy HH:mm:ss Z (z)")
     val lastProcessedMessageDate: Date
 )
 
-data class FilesState(
-    val states: Map<String, FileState>
+open class EmailServiceState(
+    val folderStates: Map<String, FolderState>
+)
+
+open class EmailServiceStates(
+    val states: Map<String, EmailServiceState>
 ) {
     companion object {
         private val K_LOGGER = KotlinLogging.logger {  }
-        fun load(path: String): FilesState {
+        fun load(path: String): EmailServiceStates {
             val file = File(path)
             if (!file.exists()) {
-                return FilesState(emptyMap())
+                return EmailServiceStates(emptyMap())
             }
             return try {
                 FileInputStream(file).use {
-                    OBJECT_MAPPER.readValue(it, FilesState::class.java)
+                    OBJECT_MAPPER.readValue(it, EmailServiceStates::class.java)
                 }
             } catch (e: Exception) {
                 K_LOGGER.error(e) { "Error while reading json state file" }
-                FilesState(emptyMap())
+                EmailServiceStates(emptyMap())
             }
         }
 
-        fun write(path: String, states: Map<String, FileState>) {
+        fun write(path: String, state: EmailServiceStates) {
             val file = File(path)
             if (!file.exists()) {
                 file.createNewFile()
             }
             FileOutputStream(file).use { outputStream ->
-                OBJECT_MAPPER.writeValue(outputStream, FilesState(states))
+                OBJECT_MAPPER.writeValue(outputStream, state)
             }
         }
         private val OBJECT_MAPPER = JsonMapper()
             .registerModule(KotlinModule.Builder().build())
             .registerModule(JavaTimeModule())
+    }
+}
+
+class MutableEmailServiceStates(states: Map<String, MutableEmailServiceState>): EmailServiceStates(states) {
+    private val _states = states.toMutableMap()
+
+    fun updateState(sessionAlias: String, state: EmailServiceState) = _states.put(sessionAlias, state.toMutable())
+
+    fun getState(): EmailServiceStates = EmailServiceStates(
+        _states.mapValues { it.value.getState() }
+    )
+
+    fun getState(sessionAlias: String) = _states[sessionAlias]
+
+    companion object {
+        fun EmailServiceStates.toMutable(): MutableEmailServiceStates = MutableEmailServiceStates(states.mapValues { (key, value) -> value.toMutable() })
+    }
+}
+
+class MutableEmailServiceState(folderStates: Map<String, FolderState>): EmailServiceState(folderStates) {
+    private val _folderStates = folderStates.toMutableMap()
+
+    fun updateState(folder: String, state: FolderState) = _folderStates.put(folder, state)
+
+    fun getState(folder: String) = _folderStates[folder]
+
+    fun getState() = EmailServiceState(_folderStates)
+
+    companion object {
+        fun EmailServiceState.toMutable(): MutableEmailServiceState = MutableEmailServiceState(folderStates)
     }
 }

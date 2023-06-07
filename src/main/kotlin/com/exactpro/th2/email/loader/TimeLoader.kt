@@ -18,7 +18,7 @@ package com.exactpro.th2.email.loader
 import java.util.Date
 
 interface TimeLoader {
-    fun loadLastProcessedMessageReceiveDate(sessionAlias: String): Date?
-    fun updateState(sessionAlias: String, fileState: FileState)
+    fun loadLastProcessedMessageReceiveDate(sessionAlias: String, folder: String): Date?
+    fun updateState(sessionAlias: String, folder: String, state: FolderState)
     fun writeState()
 }

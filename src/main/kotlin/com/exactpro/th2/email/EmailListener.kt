@@ -15,13 +15,26 @@
  */
 package com.exactpro.th2.email
 
+import com.exactpro.th2.email.filter.Filter
+import com.exactpro.th2.email.filter.Filter.Companion.allowed
 import jakarta.mail.Message
 import jakarta.mail.event.MessageCountEvent
 import jakarta.mail.event.MessageCountListener
+import java.util.*
 
-class EmailListener(val handler: (Message) -> Unit): MessageCountListener {
+class EmailListener(
+    private val handler: (Message) -> Unit,
+    private val filters: List<Filter>,
+    private val updateDate: (Date) -> Unit
+): MessageCountListener {
     override fun messagesAdded(e: MessageCountEvent) {
-        e.messages.forEach { handler(it) }
+        e.messages.forEach {
+            if(!filters.allowed(it)) {
+                it.date()?.let(updateDate)
+                return@forEach
+            }
+            handler(it)
+        }
     }
 
     override fun messagesRemoved(e: MessageCountEvent) { }

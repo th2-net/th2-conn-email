@@ -15,18 +15,23 @@
  */
 package com.exactpro.th2.email.loader
 
+import com.exactpro.th2.email.loader.MutableEmailServiceStates.Companion.toMutable
 import java.util.Date
 
 class FileTimeLoader(private val stateFilePath: String): TimeLoader {
-    private val state = FilesState.load(stateFilePath).states.toMutableMap()
+    private val state = EmailServiceStates.load(stateFilePath).toMutable()
 
-    override fun loadLastProcessedMessageReceiveDate(sessionAlias: String): Date? = state[sessionAlias]?.lastProcessedMessageDate
+    override fun loadLastProcessedMessageReceiveDate(sessionAlias: String, folder: String): Date? {
+        return state.getState(sessionAlias)?.getState(folder)?.lastProcessedMessageDate
+    }
 
-    override fun updateState(sessionAlias: String, fileState: FileState) {
-        state[sessionAlias] = fileState
+    override fun updateState(sessionAlias: String, folder: String, updatedState: FolderState) {
+        state.getState(sessionAlias)?.updateState(folder, updatedState) ?: apply {
+            state.updateState(sessionAlias, EmailServiceState(mapOf(folder to updatedState)))
+        }
     }
 
     override fun writeState() {
-        FilesState.write(stateFilePath, state)
+        EmailServiceStates.write(stateFilePath, state.getState())
     }
 }

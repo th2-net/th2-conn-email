@@ -15,8 +15,10 @@
  */
 package com.exactpro.th2.email.config
 
+import com.exactpro.th2.email.api.ISenderAuthSettings
+
 data class SenderConfig(
-    val sessionConfiguration: BaseSessionSettings,
-    val authSettings: BasicAuthSettings,
+    val sessionConfiguration: BaseSessionSettings = BaseSessionSettings(),
+    val authSettings: ISenderAuthSettings = BasicAuthSettings(),
     val reconnectInterval: Long = 1000
 )

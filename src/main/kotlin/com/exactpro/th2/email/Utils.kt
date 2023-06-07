@@ -15,9 +15,13 @@
  */
 package com.exactpro.th2.email
 
+import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.email.config.CertificateInfo
+import com.exactpro.th2.email.config.ClientSettings
 import jakarta.mail.Folder
 import jakarta.mail.Message
+import jakarta.mail.Session
+import jakarta.mail.internet.MimeMessage
 import java.io.File
 import java.io.FileInputStream
 import java.security.KeyStore
@@ -30,10 +34,6 @@ import javax.net.SocketFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 
-const val SUBJECT_PROPERTY = "Subject"
-const val FROM_PROPERTY = "From"
-const val FOLDER_PROPERTY = "Folder"
-const val DATE_PROPERTY = "Date"
 const val DATE_HEADER = "Date"
 val DATE_FORMAT = SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss Z (z)", Locale.ENGLISH)
 

@@ -15,11 +15,11 @@
  */
 package com.exactpro.th2.email.api
 
-import com.exactpro.th2.email.loader.FileState
+import com.exactpro.th2.email.loader.FolderState
 
 interface IReceiver : MailService {
     fun start()
     fun subscribe()
-    fun getState(): FileState?
+    fun getState(): FolderState?
     fun stop()
 }

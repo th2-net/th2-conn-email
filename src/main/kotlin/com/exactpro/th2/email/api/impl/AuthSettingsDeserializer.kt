@@ -13,20 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.email.config
+package com.exactpro.th2.email.api.impl
 
 import com.exactpro.th2.email.api.IReceiverAuthSettings
 import com.exactpro.th2.email.api.ISenderAuthSettings
-import jakarta.mail.Authenticator
-import jakarta.mail.PasswordAuthentication
+import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.databind.DeserializationContext
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 
-data class BasicAuthSettings(
-    val username: String = "username",
-    val password: String = "password"
-): IReceiverAuthSettings, ISenderAuthSettings {
-    override val authenticator: Authenticator = object : Authenticator() {
-        override fun getPasswordAuthentication(): PasswordAuthentication {
-            return PasswordAuthentication(username, password)
-        }
-    }
+class ReceiverAuthSettingsDeserializer<T : IReceiverAuthSettings>(private val type: Class<T>) : StdDeserializer<T>(type) {
+    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): T = p.readValueAs(type)
+}
+
+class SenderAuthSettingsDeserializer<T : ISenderAuthSettings>(private val type: Class<T>) : StdDeserializer<T>(type) {
+    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): T = p.readValueAs(type)
 }

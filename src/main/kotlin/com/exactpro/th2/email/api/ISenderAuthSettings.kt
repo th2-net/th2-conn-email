@@ -13,20 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.exactpro.th2.email.config
+package com.exactpro.th2.email.api
 
-import com.exactpro.th2.email.api.IReceiverAuthSettings
-import com.exactpro.th2.email.api.ISenderAuthSettings
-import jakarta.mail.Authenticator
-import jakarta.mail.PasswordAuthentication
-
-data class BasicAuthSettings(
-    val username: String = "username",
-    val password: String = "password"
-): IReceiverAuthSettings, ISenderAuthSettings {
-    override val authenticator: Authenticator = object : Authenticator() {
-        override fun getPasswordAuthentication(): PasswordAuthentication {
-            return PasswordAuthentication(username, password)
-        }
-    }
-}
+interface ISenderAuthSettings : IAuthSettings

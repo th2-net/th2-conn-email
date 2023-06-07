@@ -15,10 +15,26 @@
  */
 package com.exactpro.th2.email.config
 
+import jakarta.mail.internet.InternetAddress
+
 class ClientSettings(
     val sessionAlias: String,
     val from: String,
     val to: String,
+    val headersWhiteList: List<String> = listOf(SUBJECT_HEADER),
     val sender: SenderConfig,
     val receiver: ReceiverConfig
-)
+)  {
+    val fromAddress: InternetAddress = InternetAddress(from)
+    val toAddresses: Array<InternetAddress> = InternetAddress.parse(to)
+    val whitelist = headersWhiteList.toSet()
+
+    init {
+        fromAddress.validate()
+        toAddresses.forEach { it.validate() }
+    }
+
+    companion object {
+        private const val SUBJECT_HEADER = "Subject"
+    }
+}

@@ -15,10 +15,6 @@
  */
 package com.exactpro.th2.email.config
 
-enum class ReceiverType(val alias: String) {
-    IMAP("imap"), POP3("pop3");
-
-    companion object {
-        fun aliases() = values().map { it.alias }
-    }
+enum class ReceiverType {
+    IMAP, POP3;
 }

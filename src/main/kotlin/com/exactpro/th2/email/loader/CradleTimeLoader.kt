@@ -23,6 +23,7 @@ import com.exactpro.th2.dataprovider.lw.grpc.MessageSearchResponse
 import com.exactpro.th2.dataprovider.lw.grpc.MessageStream
 import com.exactpro.th2.dataprovider.lw.grpc.TimeRelation
 import com.exactpro.th2.email.DATE_PROPERTY
+import com.exactpro.th2.email.FOLDER_PROPERTY
 import com.google.protobuf.util.Timestamps
 import io.grpc.Context
 import java.time.Instant
@@ -30,26 +31,19 @@ import java.util.Date
 
 class CradleTimeLoader(
     private val dataProvider: DataProviderService,
-    private val stateFilePath: String
 ): TimeLoader {
 
-    private val state = FilesState.load(stateFilePath).states.toMutableMap()
-
-    // TODO: make it possible to filter by folder
-    override fun loadLastProcessedMessageReceiveDate(sessionAlias: String): Date? = withCancellation {
-        findMessageWithDate(dataProvider.searchMessages(createSearchRequest(sessionAlias)))
+    override fun loadLastProcessedMessageReceiveDate(sessionAlias: String, folder: String): Date? = withCancellation {
+        findMessageWithDate(dataProvider.searchMessages(createSearchRequest(sessionAlias)), folder)
     }
 
-    override fun updateState(sessionAlias: String, fileState: FileState) {
-        state[sessionAlias] = fileState
-    }
+    override fun updateState(sessionAlias: String, folder: String, fileState: FolderState) {}
 
-    override fun writeState() {
-        FilesState.write(stateFilePath, state)
-    }
+    override fun writeState() {}
 
     private fun findMessageWithDate(
-        iterator: Iterator<MessageSearchResponse>
+        iterator: Iterator<MessageSearchResponse>,
+        expectedFolder: String
     ): Date? {
         var response: MessageSearchResponse?
 
@@ -58,6 +52,8 @@ class CradleTimeLoader(
             if(!response.hasMessage()) continue
             val message = response.message
             val date = message.messagePropertiesMap[DATE_PROPERTY] ?: continue
+            val folder = message.messagePropertiesMap[FOLDER_PROPERTY] ?: continue
+            if(expectedFolder != folder) continue
             return Date(date.toLongOrNull() ?: continue)
         }
         return null

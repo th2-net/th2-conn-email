@@ -26,21 +26,27 @@ import com.exactpro.th2.common.utils.message.RawMessageBatcher
 import com.exactpro.th2.common.utils.message.sessionAlias
 import com.exactpro.th2.dataprovider.lw.grpc.DataProviderService
 import com.exactpro.th2.email.api.IReceiver
+import com.exactpro.th2.email.api.IReceiverAuthSettings
+import com.exactpro.th2.email.api.IReceiverAuthSettingsProvider
+import com.exactpro.th2.email.api.ISenderAuthSettings
+import com.exactpro.th2.email.api.ISenderAuthSettingsProvider
+import com.exactpro.th2.email.api.impl.BasicAuthSettingsProvider
 import com.exactpro.th2.email.api.impl.IMAPSessionProvider
 import com.exactpro.th2.email.api.impl.POP3SessionProvider
+import com.exactpro.th2.email.api.impl.ReceiverAuthSettingsDeserializer
 import com.exactpro.th2.email.api.impl.SMTPSessionProvider
+import com.exactpro.th2.email.api.impl.SenderAuthSettingsDeserializer
 import com.exactpro.th2.email.config.ReceiverType
 import com.exactpro.th2.email.config.Settings
 import com.exactpro.th2.email.loader.CradleTimeLoader
 import com.exactpro.th2.email.loader.FileTimeLoader
 import com.fasterxml.jackson.databind.json.JsonMapper
+import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import jakarta.mail.Message
-import jakarta.mail.internet.InternetAddress
-import jakarta.mail.internet.MimeMessage
-import java.util.Date
+import java.util.*
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -72,9 +78,17 @@ fun main(args: Array<String>) = try {
         CommonFactory()
     }.apply { resources += "factory" to ::close }
 
+    val authSettingsSenderType = load<ISenderAuthSettingsProvider>(BasicAuthSettingsProvider::class.java).senderType
+    val authSettingsReceiverType = load<IReceiverAuthSettingsProvider>(BasicAuthSettingsProvider::class.java).receiverType
+
     val mapper = JsonMapper.builder()
         .addModule(KotlinModule.Builder().configure(KotlinFeature.NullIsSameAsDefault, true).build())
         .addModule(JavaTimeModule())
+        .addModule(
+            SimpleModule()
+                .addDeserializer(IReceiverAuthSettings::class.java, ReceiverAuthSettingsDeserializer(authSettingsReceiverType))
+                .addDeserializer(ISenderAuthSettings::class.java, SenderAuthSettingsDeserializer(authSettingsSenderType))
+        )
         .build()
 
     val settings = factory.getCustomConfiguration(Settings::class.java, mapper)
@@ -112,7 +126,7 @@ fun main(args: Array<String>) = try {
         val grpcRouter = factory.grpcRouter
         resources += "grpc router" to grpcRouter::close
         val dataProviderService = grpcRouter.getService(DataProviderService::class.java)
-        CradleTimeLoader(dataProviderService, settings.stateFilePath)
+        CradleTimeLoader(dataProviderService)
     } else {
         FileTimeLoader(settings.stateFilePath)
     }
@@ -129,7 +143,7 @@ fun main(args: Array<String>) = try {
 
         val handler: (Message) -> Unit = {
             LOGGER.debug { "Received message: ${it.subject}" }
-            messageBatcher.onMessage(it.toRawMessage(connectionId, Direction.FIRST))
+            messageBatcher.onMessage(it.toRawMessage(connectionId, Direction.FIRST, client.whitelist))
         }
 
         val receiverExecutor = Executors.newSingleThreadExecutor().apply {
@@ -143,60 +157,55 @@ fun main(args: Array<String>) = try {
             }
         }
 
-        val dateLoader: () -> Date? = {
-            timeLoader.loadLastProcessedMessageReceiveDate(client.sessionAlias)
+        val dateLoader: (folder: String) -> Date? = {
+            timeLoader.loadLastProcessedMessageReceiveDate(client.sessionAlias, it)
         }
 
         val receiver = when (client.receiver.type) {
-            ReceiverType.IMAP.alias -> {
+            ReceiverType.IMAP -> {
                 val sessionProvider = IMAPSessionProvider(client.receiver.sessionConfiguration)
-                val authenticator = client.receiver.authSettings.authenticator()
+                val authenticator = client.receiver.authSettings.authenticator
                 IMAPReceiver(
                     sessionProvider.getSession(authenticator),
                     handler,
                     client.receiver,
                     receiverExecutor,
-                    dateLoader
+                    { dateLoader(client.receiver.folder) }
                 ) {
                     eventRouter.sendAll(it.toBatchProto(rootEventId))
                 }
             }
-            ReceiverType.POP3.alias -> {
+            ReceiverType.POP3 -> {
                 val sessionProvider = POP3SessionProvider(client.receiver.sessionConfiguration)
-                val authenticator = client.receiver.authSettings.authenticator()
+                val authenticator = client.receiver.authSettings.authenticator
                 POP3Receiver(
                     sessionProvider.getSession(authenticator),
                     handler,
                     client.receiver,
                     receiverExecutor,
-                    dateLoader
+                    { dateLoader(client.receiver.folder) }
                 ) {
                     eventRouter.sendAll(it.toBatchProto(rootEventId))
                 }
             }
-            else -> error("Unknown receiver type: ${client.receiver.type}")
         }
 
         val senderSessionProvider = SMTPSessionProvider(client.sender.sessionConfiguration)
-        val senderAuth = client.sender.authSettings.authenticator()
+        val senderAuth = client.sender.authSettings.authenticator
 
         val sender = SMTPSender(senderSessionProvider.getSession(senderAuth), client.sender.reconnectInterval)
 
         val send: (RawMessage) -> Unit = {
-            val message = MimeMessage(sender.session)
-            message.setFrom(InternetAddress(client.from))
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(client.to))
-            message.setText(it.body.toString(Charsets.UTF_8))
-            message.subject = it.metadata.propertiesMap[SUBJECT_PROPERTY]
+            val message = it.toMimeMessage(sender.session, client)
             sender.send(message)
-            messageBatcher.onMessage(message.toRawMessage(connectionId, Direction.SECOND))
+            messageBatcher.onMessage(message.toRawMessage(connectionId, Direction.SECOND, client.whitelist))
         }
 
         receivers[client.sessionAlias] = receiver
         sendHandlers[client.sessionAlias] = send
 
         resources += "${client.sessionAlias} receiver state" to {
-            receiver.getState()?.let { timeLoader.updateState(client.sessionAlias, it) }
+            receiver.getState()?.let { timeLoader.updateState(client.sessionAlias, client.receiver.folder, it) }
         }
 
         resources += "${client.sessionAlias} sender" to sender::close
@@ -223,5 +232,16 @@ fun main(args: Array<String>) = try {
 } catch (e: Exception) {
     LOGGER.error(e) { "Uncaught exception. Shutting down" }
     exitProcess(1)
+}
+
+private inline fun <reified T> load(defaultImpl: Class<out T>): T {
+    val instances = ServiceLoader.load(T::class.java).toList()
+
+    return when (instances.size) {
+        0 -> error("No instances of ${T::class.simpleName}")
+        1 -> instances.first()
+        2 -> instances.first { !defaultImpl.isInstance(it) }
+        else -> error("More than 1 non-default instance of ${T::class.simpleName} has been found: $instances")
+    }
 }
 
