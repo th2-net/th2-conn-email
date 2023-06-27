@@ -113,7 +113,7 @@ fun main(args: Array<String>) = try {
         batchSelector = { it.sessionAlias to it.direction },
         batcherExecutor,
     ) {
-        messageRouter.sendAll(it, QueueAttribute.RAW.name, QueueAttribute.PUBLISH.name)
+        messageRouter.send(it, QueueAttribute.RAW.name)
     }
 
     val rootEventId = toEventID(factory.rootEventId)
