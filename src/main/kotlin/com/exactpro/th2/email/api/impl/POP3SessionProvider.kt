@@ -34,11 +34,11 @@ class POP3SessionProvider(private val sessionSettings: BaseSessionSettings): Ses
         put(MAIL_STORE_PROTOCOL, PROTOCOL)
 
         if(sessionSettings.ssl) {
-            put(MAIL_POP3_SSL_ENABLE, "true")
+            put(MAIL_POP3_SSL_ENABLE, true)
         }
 
         if(sessionSettings.startTls) {
-            put(MAIL_POP3_STARTTLS_ENABLE, "true")
+            put(MAIL_POP3_STARTTLS_ENABLE, true)
         }
 
         if(sessionSettings.acceptAllCerts && sessionSettings.customCertificate == null) {

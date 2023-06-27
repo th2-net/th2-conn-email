@@ -30,15 +30,15 @@ class SMTPSessionProvider(private val sessionSettings: BaseSessionSettings): Ses
         put(MAIL_SMTP_PORT, sessionSettings.port)
         put(MAIL_SMTP_USER, sessionSettings.user)
 
-        put(MAIL_SMTP_AUTH, "true")
+        put(MAIL_SMTP_AUTH, true)
         put(MAIL_TRANSPORT_PROTOCOL, PROTOCOL)
 
         if(sessionSettings.ssl) {
-            put(MAIL_SMTP_SSL_ENABLE, "true")
+            put(MAIL_SMTP_SSL_ENABLE, true)
         }
 
         if(sessionSettings.startTls) {
-            put(MAIL_SMTP_STARTTLS_ENABLE, "true");
+            put(MAIL_SMTP_STARTTLS_ENABLE, true);
         }
 
         if(sessionSettings.acceptAllCerts && sessionSettings.customCertificate == null) {
