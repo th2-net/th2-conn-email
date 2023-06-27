@@ -43,6 +43,7 @@ class POP3SessionProvider(private val sessionSettings: BaseSessionSettings): Ses
 
         if(sessionSettings.acceptAllCerts && sessionSettings.customCertificate == null) {
             put(MAIL_POP3_SSL_TRUST, "*")
+            put(MAIL_POP3_CHECK_SERVER_IDENTITY, false)
         }
 
         if(sessionSettings.customCertificate != null) {
@@ -63,6 +64,7 @@ class POP3SessionProvider(private val sessionSettings: BaseSessionSettings): Ses
         private const val MAIL_POP3_STARTTLS_ENABLE = "mail.pop3.starttls.enable"
         private const val MAIL_POP3_SSL_ENABLE = "mail.pop3.ssl.enable"
         private const val MAIL_SSL_SOCKET_FACTORY = "mail.pop3.ssl.socketFactory"
+        private const val MAIL_POP3_CHECK_SERVER_IDENTITY = "mail.pop3.ssl.checkserveridentity"
 
         const val MAIL_STORE_PROTOCOL = "mail.store.protocol"
         const val PROTOCOL = "pop3"

@@ -40,6 +40,7 @@ class IMAPSessionProvider(private val sessionSettings: BaseSessionSettings): Ses
 
         if(sessionSettings.acceptAllCerts && sessionSettings.customCertificate == null) {
             put(MAIL_IMAP_SSL_TRUST, "*")
+            put(MAIL_IMAP_CHECK_SERVER_IDENTITY, false)
         }
 
         if(sessionSettings.customCertificate != null) {
@@ -59,6 +60,7 @@ class IMAPSessionProvider(private val sessionSettings: BaseSessionSettings): Ses
         private const val MAIL_IMAP_STARTTLS_ENABLE = "mail.imap.starttls.enable"
         private const val MAIL_IMAP_SSL_ENABLE = "mail.imap.ssl.enable"
         private const val MAIL_SSL_SOCKET_FACTORY = "mail.smtp.ssl.socketFactory"
+        private const val MAIL_IMAP_CHECK_SERVER_IDENTITY = "mail.imap.ssl.checkserveridentity"
 
         private const val MAIL_STORE_PROTOCOL = "mail.store.protocol"
         private const val PROTOCOL = "imap"

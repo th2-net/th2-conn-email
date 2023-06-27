@@ -43,6 +43,7 @@ class SMTPSessionProvider(private val sessionSettings: BaseSessionSettings): Ses
 
         if(sessionSettings.acceptAllCerts && sessionSettings.customCertificate == null) {
             put(MAIL_SMTP_SSL_TRUST, "*")
+            put(MAIL_SMTP_CHECK_SERVER_IDENTITY, false)
         }
 
         if(sessionSettings.customCertificate != null) {
@@ -63,6 +64,7 @@ class SMTPSessionProvider(private val sessionSettings: BaseSessionSettings): Ses
         private const val MAIL_SMTP_STARTTLS_ENABLE = "mail.smtp.starttls.enable"
         private const val MAIL_SMTP_SSL_ENABLE = "mail.smtp.ssl.enable"
         private const val MAIL_SSL_SOCKET_FACTORY = "mail.smtp.ssl.socketFactory"
+        private const val MAIL_SMTP_CHECK_SERVER_IDENTITY = "mail.smtp.ssl.checkserveridentity"
 
         private const val MAIL_TRANSPORT_PROTOCOL = "mail.transport.protocol"
         private const val PROTOCOL = "smtp"
