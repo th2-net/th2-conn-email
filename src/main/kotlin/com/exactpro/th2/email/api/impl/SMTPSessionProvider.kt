@@ -42,7 +42,7 @@ class SMTPSessionProvider(private val sessionSettings: BaseSessionSettings): Ses
         }
 
         if(sessionSettings.acceptAllCerts && sessionSettings.customCertificate == null) {
-            put(MAIL_SMTP_SSL_TRUST, sessionSettings.host)
+            put(MAIL_SMTP_SSL_TRUST, "*")
         }
 
         if(sessionSettings.customCertificate != null) {

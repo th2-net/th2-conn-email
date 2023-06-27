@@ -39,7 +39,7 @@ class IMAPSessionProvider(private val sessionSettings: BaseSessionSettings): Ses
         }
 
         if(sessionSettings.acceptAllCerts && sessionSettings.customCertificate == null) {
-            put(MAIL_IMAP_SSL_TRUST, sessionSettings.host)
+            put(MAIL_IMAP_SSL_TRUST, "*")
         }
 
         if(sessionSettings.customCertificate != null) {

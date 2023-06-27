@@ -42,7 +42,7 @@ class POP3SessionProvider(private val sessionSettings: BaseSessionSettings): Ses
         }
 
         if(sessionSettings.acceptAllCerts && sessionSettings.customCertificate == null) {
-            put(MAIL_POP3_SSL_TRUST, sessionSettings.host)
+            put(MAIL_POP3_SSL_TRUST, "*")
         }
 
         if(sessionSettings.customCertificate != null) {
