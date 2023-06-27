@@ -28,6 +28,7 @@ import jakarta.mail.Session
 import java.lang.Integer.min
 import java.util.Date
 import java.util.concurrent.ExecutorService
+import mu.KotlinLogging
 import org.eclipse.angus.mail.imap.IMAPFolder
 import org.eclipse.angus.mail.imap.IMAPStore
 
@@ -57,7 +58,11 @@ class IMAPReceiver(
     @Volatile private var isRunning = true
 
     override fun start() {
-        store.connect()
+        try {
+            store.connect()
+        } catch (e: Exception) {
+            K_LOGGER.error(e) { "Error while connection to server." }
+        }
         isRunning = true
         folder = store.getFolder(receiverConfig.folder) as IMAPFolder
     }
@@ -111,5 +116,9 @@ class IMAPReceiver(
         folder.removeMessageCountListener(emailListener)
         if(folder.isOpen) folder.close()
         store.close()
+    }
+
+    companion object {
+        private val K_LOGGER = KotlinLogging.logger {  }
     }
 }
