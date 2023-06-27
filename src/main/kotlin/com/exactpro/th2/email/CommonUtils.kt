@@ -35,6 +35,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -82,9 +83,18 @@ val AnyMessage.messageId: MessageID
         else -> error("Cannot get message id from $kindCase message: ${toJson()}")
     }
 
-val generateSequence = Instant.now().run {
-    AtomicLong(TimeUnit.SECONDS.toNanos(epochSecond) + nano)
+private val INCOMING_SEQUENCES = ConcurrentHashMap<String, () -> Long>()
+private val OUTGOING_SEQUENCES = ConcurrentHashMap<String, () -> Long>()
+
+private fun newSequencer(): () -> Long = Instant.now().run {
+    AtomicLong(epochSecond * TimeUnit.SECONDS.toNanos(1) + nano)
 }::incrementAndGet
+
+private fun String.getSequence(direction: Direction) = when (direction) {
+    Direction.FIRST -> INCOMING_SEQUENCES.getOrPut(this, ::newSequencer)
+    Direction.SECOND -> OUTGOING_SEQUENCES.getOrPut(this, ::newSequencer)
+    Direction.UNRECOGNIZED -> error("Unknown direction $direction in session: $this")
+}.invoke()
 
 fun createId(connectionId: ConnectionID, sequence: Long): MessageID = MessageID.newBuilder().apply {
     this.connectionId = connectionId
@@ -120,7 +130,7 @@ fun MailMessage.toRawMessage(
         ),
     )
 
-    this.metadataBuilder.id = createId(connectionId, generateSequence())
+    this.metadataBuilder.id = createId(connectionId, connectionId.sessionAlias.getSequence(direction))
     this.direction = direction
     val outputStream = ByteArrayOutputStream()
     cleanMimeMessage.writeTo(outputStream)
