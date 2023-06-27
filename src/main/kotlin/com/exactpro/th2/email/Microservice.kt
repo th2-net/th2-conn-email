@@ -57,6 +57,7 @@ import kotlin.system.exitProcess
 import mu.KotlinLogging
 
 private val LOGGER = KotlinLogging.logger { }
+private val QUEUE_ATTRIBUTES = arrayOf(QueueAttribute.RAW.value, QueueAttribute.PUBLISH.value, QueueAttribute.STORE.value)
 
 fun main(args: Array<String>) = try {
     val resources = ConcurrentLinkedDeque<Pair<String, () -> Unit>>()
@@ -113,7 +114,11 @@ fun main(args: Array<String>) = try {
         batchSelector = { it.sessionAlias to it.direction },
         batcherExecutor,
     ) {
-        messageRouter.send(it, QueueAttribute.RAW.name)
+        try {
+            messageRouter.sendAll(it, *QUEUE_ATTRIBUTES)
+        } catch (e: Exception) {
+            LOGGER.error(e) { "Error while sending batch." }
+        }
     }
 
     val rootEventId = toEventID(factory.rootEventId)
