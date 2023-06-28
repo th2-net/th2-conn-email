@@ -24,7 +24,7 @@ import com.exactpro.th2.common.schema.factory.CommonFactory
 import com.exactpro.th2.common.schema.message.QueueAttribute
 import com.exactpro.th2.common.utils.message.RawMessageBatcher
 import com.exactpro.th2.common.utils.message.sessionAlias
-import com.exactpro.th2.dataprovider.lw.grpc.DataProviderService
+import com.exactpro.th2.dataprovider.grpc.DataProviderService
 import com.exactpro.th2.email.api.IReceiver
 import com.exactpro.th2.email.api.IReceiverAuthSettings
 import com.exactpro.th2.email.api.IReceiverAuthSettingsProvider

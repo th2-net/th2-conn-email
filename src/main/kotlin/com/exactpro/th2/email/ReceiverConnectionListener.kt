@@ -32,7 +32,7 @@ class ReceiverConnectionListener(
     override fun opened(e: ConnectionEvent?) {
         executor.submit {
             onInfo("Started service: ${receiver.service}")
-            receiver.subscribe()
+            subscribe()
         }
     }
     override fun closed(e: ConnectionEvent?) {}
@@ -47,6 +47,15 @@ class ReceiverConnectionListener(
                 onError("Reconnection attempt failed. Next attempt in $reconnectInterval MS. Service: ${receiver.service}", e)
                 Thread.sleep(reconnectInterval)
             }
+        }
+    }
+
+    private fun subscribe() {
+        try {
+            receiver.subscribe()
+        } catch (ex: Exception) {
+            K_LOGGER.error(ex) { "Error while subscribing" }
+            subscribe()
         }
     }
 

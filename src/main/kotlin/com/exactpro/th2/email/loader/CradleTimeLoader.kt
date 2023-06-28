@@ -17,11 +17,7 @@ package com.exactpro.th2.email.loader
 
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.message.toTimestamp
-import com.exactpro.th2.dataprovider.lw.grpc.DataProviderService
-import com.exactpro.th2.dataprovider.lw.grpc.MessageSearchRequest
-import com.exactpro.th2.dataprovider.lw.grpc.MessageSearchResponse
-import com.exactpro.th2.dataprovider.lw.grpc.MessageStream
-import com.exactpro.th2.dataprovider.lw.grpc.TimeRelation
+import com.exactpro.th2.dataprovider.grpc.*
 import com.exactpro.th2.email.DATE_PROPERTY
 import com.exactpro.th2.email.FOLDER_PROPERTY
 import com.google.protobuf.util.Timestamps
