@@ -52,9 +52,9 @@ class IMAPReceiver(
     private val filters: List<Filter> = receiverConfig.filters
     private val emailListener = EmailListener(handler, filters) { lastProcessedMessageDate = it }
 
-    private lateinit var folder: IMAPFolder
     private var lastProcessedMessageDate: Date? = getLastProcessedDate()
 
+    @Volatile private var folder: IMAPFolder? = null
     @Volatile private var isRunning = true
 
     override fun start() {
@@ -64,11 +64,12 @@ class IMAPReceiver(
             K_LOGGER.error(e) { "Error while connection to server." }
         }
         isRunning = true
-        folder = store.getFolder(receiverConfig.folder) as IMAPFolder
     }
 
     override fun subscribe() {
+        val folder = store.getFolder(receiverConfig.folder) as IMAPFolder
         if(!folder.isOpen) folder.open(Folder.READ_ONLY)
+        this.folder = folder
 
         val resumeDate = resumeDate(lastProcessedMessageDate, receiverConfig.startProcessingAtLeastFrom)
         val resumeMessage = if(resumeDate == null) {
@@ -113,8 +114,8 @@ class IMAPReceiver(
 
     override fun stop() {
         isRunning = false
-        folder.removeMessageCountListener(emailListener)
-        if(folder.isOpen) folder.close()
+        folder?.removeMessageCountListener(emailListener)
+        if(folder?.isOpen == true) folder?.close()
         store.close()
     }
 
