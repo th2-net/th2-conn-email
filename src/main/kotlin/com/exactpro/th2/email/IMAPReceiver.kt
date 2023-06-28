@@ -75,29 +75,31 @@ class IMAPReceiver(
         val resumeMessage = if(resumeDate == null) {
             1
         } else {
-            findResumeMessageNumber(folder, resumeDate) ?: return
+            findResumeMessageNumber(folder, resumeDate)
         }
 
-        var rangeStart = resumeMessage
-        var rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
+        if(resumeMessage != null) {
+            var rangeStart = resumeMessage as Int
+            var rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
 
-        while (rangeEnd <= folder.messageCount) {
-            val messages = if(rangeEnd - rangeStart <= 1) {
-                arrayOf(folder.getMessage(rangeEnd))
-            } else {
-                folder.getMessages(rangeStart, rangeEnd)
-            }
-            for (message in messages) {
-                if(!filters.allowed(message)) {
-                    message.date()?.let { lastProcessedMessageDate = it }
-                    continue
+            while (rangeEnd <= folder.messageCount) {
+                val messages = if(rangeEnd - rangeStart <= 1) {
+                    arrayOf(folder.getMessage(rangeEnd))
+                } else {
+                    folder.getMessages(rangeStart, rangeEnd)
                 }
-                handler(message)
-                message.date()?.let { lastProcessedMessageDate = it }
+                for (message in messages) {
+                    if(!filters.allowed(message)) {
+                        message.date()?.let { lastProcessedMessageDate = it }
+                        continue
+                    }
+                    handler(message)
+                    message.date()?.let { lastProcessedMessageDate = it }
+                }
+                if(rangeEnd == folder.messageCount) break
+                rangeStart = rangeEnd
+                rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
             }
-            if(rangeEnd == folder.messageCount) break
-            rangeStart = rangeEnd
-            rangeEnd = min(rangeStart + receiverConfig.fetchCount, folder.messageCount)
         }
 
         folder.addMessageCountListener(emailListener)
