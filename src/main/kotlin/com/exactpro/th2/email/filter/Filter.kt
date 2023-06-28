@@ -17,11 +17,19 @@ package com.exactpro.th2.email.filter
 
 import jakarta.mail.Message
 import jakarta.mail.internet.InternetAddress
+import java.util.regex.Pattern
 
-class Filter(private val senderFilter: SenderFilter? = null) {
+class Filter(
+    private val senderFilter: SenderFilter? = null,
+    private val subjectFilter: SubjectFilter? = null
+) {
     fun isAllowed(message: Message): Boolean {
         senderFilter?.let {
-            it.isAllowed(message)
+            return it.isAllowed(message)
+        }
+
+        subjectFilter?.let {
+            return it.isAllowed(message)
         }
 
         return true
@@ -29,6 +37,14 @@ class Filter(private val senderFilter: SenderFilter? = null) {
 
     companion object {
         fun List<Filter>.allowed(message: Message) = all { it.isAllowed(message) }
+    }
+}
+
+data class SubjectFilter(val subjectRegexp: String) {
+    private val pattern = Regex(subjectRegexp)
+
+    fun isAllowed(message: Message): Boolean {
+        return pattern.matches(message.subject)
     }
 }
 

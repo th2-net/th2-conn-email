@@ -28,6 +28,7 @@ import com.google.protobuf.util.Timestamps
 import io.grpc.Context
 import java.time.Instant
 import java.util.Date
+import mu.KotlinLogging
 
 class CradleTimeLoader(
     private val dataProvider: DataProviderService,
@@ -35,6 +36,8 @@ class CradleTimeLoader(
 
     override fun loadLastProcessedMessageReceiveDate(sessionAlias: String, folder: String): Date? = withCancellation {
         findMessageWithDate(dataProvider.searchMessages(createSearchRequest(sessionAlias)), folder)
+    }.also {
+        K_LOGGER.info { "Starting processing messages from $it for session $sessionAlias." }
     }
 
     override fun updateState(sessionAlias: String, folder: String, fileState: FolderState) {}
@@ -74,6 +77,7 @@ class CradleTimeLoader(
 
     companion object {
         const val BASE_64_FORMAT = "BASE_64"
+        private val K_LOGGER = KotlinLogging.logger {  }
 
         fun <T> withCancellation(code: () -> T): T {
             return Context.current().withCancellation().use { context ->
